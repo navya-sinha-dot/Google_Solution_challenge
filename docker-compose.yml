@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: amd_hack_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: amd_hack
+      POSTGRES_USER: amd_user
+      POSTGRES_PASSWORD: amd_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - amd_hack_pgdata:/var/lib/postgresql/data
+
+volumes:
+  amd_hack_pgdata:
