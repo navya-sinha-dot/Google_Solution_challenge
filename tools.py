@@ -5,31 +5,39 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timedelta
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # Lazy-load DATABASE_URL to ensure systemd environment is available
 _engine = None
 _SessionLocal = None
 
 def _get_engine():
-    """Lazy initialize database engine from systemd environment or use default SQLite"""
+    """Lazy initialize database engine from environment or use default SQLite"""
     global _engine, _SessionLocal
     if _engine is None:
+        load_dotenv()
         DATABASE_URL = os.getenv("DATABASE_URL")
         
-        # Use default SQLite database if DATABASE_URL not set
-        if not DATABASE_URL:
-            # Use current directory on Windows/development, /home/pi on production
-            if os.name == 'nt':  # Windows
-                db_path = "sensor_data.db"
-            else:  # Linux
-                db_path = os.path.expanduser("/home/pi/agentic/sensor_data.db")
-            DATABASE_URL = f"sqlite:///{db_path}"
-            print(f"\n[LAZY INIT] Using default SQLite: {DATABASE_URL}")
+        if DATABASE_URL:
+            # Clean up the URL if it's a Neon URL with pooler options
+            if "neon.tech" in DATABASE_URL and "sslmode" not in DATABASE_URL:
+                if "?" in DATABASE_URL:
+                    DATABASE_URL += "&sslmode=require"
+                else:
+                    DATABASE_URL += "?sslmode=require"
+            
+            print(f"\n[DB INIT] Connecting to PostgreSQL (Neon): {DATABASE_URL.split('@')[-1].split('/')[0]}")
+            _engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_size=5, max_overflow=10)
         else:
-            print(f"\n[LAZY INIT] DATABASE_URL from environment: {DATABASE_URL}")
+            # Fallback to local SQLite only if no DATABASE_URL is found
+            db_path = "sensor_data.db"
+            DATABASE_URL = f"sqlite:///{db_path}"
+            print(f"\n[DB INIT] No DATABASE_URL found. Falling back to local SQLite: {DATABASE_URL}")
+            _engine = create_engine(DATABASE_URL)
         
-        _engine = create_engine(DATABASE_URL, pool_pre_ping=True)
         _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
-        print(f"[LAZY INIT] Engine created successfully with: {DATABASE_URL[:50]}...")
     
     return _engine, _SessionLocal
 

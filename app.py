@@ -556,15 +556,19 @@ async def agricultural_qa(question: str, station_id: str = "WS01"):
         latest = db.execute(latest_query, {"station_id": station_id}).fetchone()
         
         # Query historical data (last 24 hours)
+        start_time = datetime.now() - timedelta(hours=24)
         historical_query = text("""
             SELECT temperature, humidity, soil_moisture, timestamp 
             FROM weather_data 
             WHERE station_id = :station_id 
-            AND timestamp > datetime('now', '-24 hours')
+            AND timestamp > :start_time
             ORDER BY timestamp DESC
         """)
         
-        historical = db.execute(historical_query, {"station_id": station_id}).fetchall()
+        historical = db.execute(historical_query, {
+            "station_id": station_id,
+            "start_time": start_time
+        }).fetchall()
         
         # Format sensor data for LLM
         sensor_data = {}

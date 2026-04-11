@@ -9,8 +9,8 @@ import {
   Sparkles, Printer,
 } from 'lucide-react';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/sensors';
-const API_BASE = 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_URL || import.meta.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API = `${API_BASE}/api/sensors`;
 
 interface SensorData {
   temperature: number;

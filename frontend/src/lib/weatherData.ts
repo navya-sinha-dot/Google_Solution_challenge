@@ -1,7 +1,11 @@
 // Weather data integration with FastAPI backend
 // Connects to http://localhost:8000/api/sensors/
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/sensors';
+const HOST_URL = import.meta.env.VITE_API_URL || import.meta.env.REACT_APP_API_URL || 'http://localhost:8000';
+// Ensure API_BASE always includes the path correctly
+const API_BASE = HOST_URL.endsWith('/') 
+  ? `${HOST_URL}api/sensors` 
+  : `${HOST_URL}/api/sensors`;
 const STATION_ID = import.meta.env.VITE_STATION_ID || 'WS01';
 
 export interface WeatherData {
@@ -125,8 +129,8 @@ export async function getSystemHealth(): Promise<SystemHealth> {
     if (!response.ok) throw new Error('Failed to fetch system health');
     
     const data = await response.json();
-    const battery = data.battery_voltage || 12.8;
-    const solar = data.solar_voltage || 0;
+    const battery = data.batteryVoltage ?? data.battery_voltage ?? 12.8;
+    const solar = data.solarVoltage ?? data.solar_voltage ?? 0;
     
     // Calculate battery status based on voltage
     let batteryStatus: 'healthy' | 'low' | 'critical' = 'healthy';
@@ -178,7 +182,7 @@ export async function getHistoricalData(hours: number = 24): Promise<{ time: str
   try {
     // Build the URL to fetch historical data from the backend
     const limit = Math.ceil(hours / 0.25); // ~96 records for 24 hours
-    const url = `${API_BASE}/sensors/history/${STATION_ID}?limit=${limit}`;
+    const url = `${API_BASE}/history/${STATION_ID}?limit=${limit}`;
     console.log(' Fetching historical data from:', url);
     
     const response = await fetch(url);

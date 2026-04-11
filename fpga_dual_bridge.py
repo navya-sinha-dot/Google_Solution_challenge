@@ -9,6 +9,9 @@ import serial
 import time
 import struct
 import os
+import joblib
+import pandas as pd
+from datetime import datetime
 from typing import Dict, Tuple, Optional
 import sys
 
@@ -38,6 +41,12 @@ class DualAcceleratorBridge:
         self.baud = baud
         self.timeout = timeout
         self.serial = None
+        
+        # ML model placeholders
+        self.rain_model = None
+        self.health_model = None
+        self.irrigation_model = None
+        self._load_ml_models()
         
         if not simulation:
             try:
@@ -99,7 +108,33 @@ class DualAcceleratorBridge:
                 print(f"[ERROR] Failed to connect to {port}: {e}")
                 print(f"[INFO] Available ports were: {self.list_available_ports()}")
                 self.simulation = True
-                print("[FALLBACK] Running in simulation mode")
+                print("[FALLBACK] Running in simulation/model mode")
+    
+    def _load_ml_models(self):
+        """Load trained ML models from models_cache directory"""
+        try:
+            cache_dir = os.path.join(os.path.dirname(__file__), 'models_cache')
+            
+            # Load Rain Model
+            rain_path = os.path.join(cache_dir, 'rain_model.pkl')
+            if os.path.exists(rain_path):
+                self.rain_model = joblib.load(rain_path)
+                print(f"[ML] Successfully loaded rain_model.pkl")
+            
+            # Load Crop Health Model
+            health_path = os.path.join(cache_dir, 'crop_health_model.pkl')
+            if os.path.exists(health_path):
+                self.health_model = joblib.load(health_path)
+                print(f"[ML] Successfully loaded crop_health_model.pkl")
+                
+            # Load Irrigation Model
+            irrigation_path = os.path.join(cache_dir, 'irrigation_model.pkl')
+            if os.path.exists(irrigation_path):
+                self.irrigation_model = joblib.load(irrigation_path)
+                print(f"[ML] Successfully loaded irrigation_model.pkl")
+                
+        except Exception as e:
+            print(f"[ERROR] Failed to load ML models: {e}")
     
     def close(self):
         """Close serial connection"""
@@ -236,6 +271,48 @@ class DualAcceleratorBridge:
             except Exception as e:
                 print(f"[ERROR] Parsing SF result: {e}")
         
+        # Use ML model if available
+        if self.health_model:
+            try:
+                # Features: soil_moisture, temperature, humidity, light
+                features = pd.DataFrame([{
+                    'soil_moisture': soil,
+                    'temperature': temp,
+                    'humidity': humid,
+                    'light': light
+                }])
+                
+                # Predict stress/health
+                # Assumption: Model predicts either stress index or categorical health
+                # We'll try to get a numeric score if possible
+                try:
+                    # If it has predict_proba, use it for score
+                    if hasattr(self.health_model, 'predict_proba'):
+                        probs = self.health_model.predict_proba(features)[0]
+                        # Assume higher class = more stress
+                        stress_index = int(probs[-1] * 100) if len(probs) > 1 else 50
+                    else:
+                        prediction = self.health_model.predict(features)[0]
+                        stress_index = int(prediction) if isinstance(prediction, (int, float)) else 50
+                except:
+                    stress_index = 45 # Default to mid-range
+                
+                fusion_score = max(0, min(100, 100 - stress_index))
+                alert_level = 3 if stress_index > 75 else 2 if stress_index > 50 else 1 if stress_index > 30 else 0
+                
+                print(f"[ML] Health prediction used: stress={stress_index}, fusion={fusion_score}")
+                
+                return {
+                    "fusion_score": fusion_score,
+                    "stress_index": stress_index,
+                    "alert_level": alert_level,
+                    "alert_name": "Critical" if alert_level >= 3 else "High Stress" if alert_level >= 2 else "Moderate" if alert_level >= 1 else "Normal",
+                    "timestamp": int(time.time() * 1000),
+                    "source": "ml_model_prediction"
+                }
+            except Exception as ml_err:
+                print(f"[WARNING] ML health prediction failed: {ml_err}. Using computed fallback.")
+        
         # Compute meaningful fallback from actual sensor inputs
         print(f"[FALLBACK] Computing fusion from sensor inputs: soil={soil}, temp={temp}, humid={humid}, light={light}")
         
@@ -287,6 +364,46 @@ class DualAcceleratorBridge:
             except Exception as e:
                 print(f"[ERROR] Parsing RP result: {e}")
         
+        # Use ML model if available
+        if self.rain_model:
+            try:
+                # Features based on weather_workflow_llm_first.py
+                # ['temperature', 'humidity', 'pressure', 'wind_speed', 'hour', 'pressure_change_30min']
+                features = pd.DataFrame([{
+                    'temperature': temp,
+                    'humidity': humid,
+                    'pressure': pressure,
+                    'wind_speed': wind,
+                    'hour': datetime.now().hour,
+                    'pressure_change_30min': 0 # Default if unknown in bridge
+                }])
+                
+                # Predict rain prob
+                try:
+                    if hasattr(self.rain_model, 'predict_proba'):
+                        probs = self.rain_model.predict_proba(features)[0]
+                        rain_prob = int(probs[1] * 100) if len(probs) > 1 else 50
+                    else:
+                        rain_prob = int(self.rain_model.predict(features)[0])
+                except:
+                    rain_prob = 30 # Default low-mid
+                
+                # Simple stress/alert derivation from prob
+                stress_level = int(max(0, min(100, abs(temp - 25) * 3 + max(0, humid - 70))))
+                rain_alert = 1 if rain_prob > 60 else 0
+                
+                print(f"[ML] Rain prediction used: prob={rain_prob}%, alert={rain_alert}")
+                
+                return {
+                    "rain_probability": rain_prob,
+                    "stress_level": stress_level,
+                    "rain_alert": rain_alert,
+                    "timestamp": int(time.time() * 1000),
+                    "source": "ml_model_prediction"
+                }
+            except Exception as ml_err:
+                print(f"[WARNING] ML rain prediction failed: {ml_err}. Using computed fallback.")
+        
         # Compute meaningful fallback from actual weather inputs
         print(f"[FALLBACK] Computing rain prediction from inputs: temp={temp}, humid={humid}, pressure={pressure}, wind={wind}")
         
@@ -324,15 +441,40 @@ class DualAcceleratorBridge:
             "recommended_action": "NONE"
         }
         
-        # Decision logic: combine both accelerators
-        if sf_result["alert_level"] >= 3 and rp_result["rain_alert"] == 1:
-            combined["combined_alert"] = 1
-            combined["recommended_action"] = "IRRIGATE_NOW"
-        elif rp_result["rain_probability"] > 70:
-            combined["combined_alert"] = 1
-            combined["recommended_action"] = "WAIT_FOR_RAIN"
-        elif sf_result["alert_level"] >= 2:
-            combined["recommended_action"] = "MONITOR"
+        # Use ML Irrigation model if available
+        if self.irrigation_model:
+            try:
+                # Features: soil_moisture, temperature, humidity, rain_prob
+                irr_features = pd.DataFrame([{
+                    'soil_moisture': soil,
+                    'temperature': temp,
+                    'humidity': humid,
+                    'rain_probability': rp_result.get("rain_probability", 0)
+                }])
+                
+                # Predict irrigation need
+                irr_need = self.irrigation_model.predict(irr_features)[0]
+                if irr_need == 1: # 1 means needs irrigation
+                    combined["recommended_action"] = "IRRIGATE_SOON"
+                    if sf_result["alert_level"] >= 2:
+                        combined["recommended_action"] = "IRRIGATE_NOW"
+                else:
+                    combined["recommended_action"] = "NO_IRRIGATION_NEEDED"
+                    
+                print(f"[ML] Irrigation model used: need={irr_need}, action={combined['recommended_action']}")
+            except Exception as irr_err:
+                print(f"[WARNING] ML irrigation prediction failed: {irr_err}")
+
+        # Basic decision logic as final check
+        if not combined["recommended_action"] or combined["recommended_action"] == "NONE":
+            if sf_result["alert_level"] >= 3 and rp_result["rain_alert"] == 1:
+                combined["combined_alert"] = 1
+                combined["recommended_action"] = "IRRIGATE_NOW"
+            elif rp_result["rain_probability"] > 70:
+                combined["combined_alert"] = 1
+                combined["recommended_action"] = "WAIT_FOR_RAIN"
+            elif sf_result["alert_level"] >= 2:
+                combined["recommended_action"] = "MONITOR"
         
         return combined
 

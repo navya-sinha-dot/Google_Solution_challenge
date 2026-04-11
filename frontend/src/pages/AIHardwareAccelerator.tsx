@@ -106,7 +106,7 @@ export default function AIHardwareAccelerator() {
       const rect = canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
-      
+
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         const dx = p.x - mx;
@@ -356,18 +356,18 @@ export default function AIHardwareAccelerator() {
         setConnectionStatus(true);
         setLastUpdateSeconds(0);
         setCurrentSensorData({
-          temperature: data.temperature || 25,
-          humidity: data.humidity || 60,
-          pressure: data.pressure || 1013,
-          wind_speed: data.windSpeed || data.wind_speed || 5,
-          rainfall: data.rainfall || 0,
-          soil_moisture: data.soilMoisture || data.soil_moisture || 50,
-          soil_temperature: data.soilTemperature || data.soil_temperature || 26,
-          light_level: data.lightIntensity || data.light_level || 70,
-          pm25: data.airQualityPM25 || data.pm25 || 60,
-          pm10: data.airQualityPM10 || data.pm10 || 120,
-          uv_index: data.uvIndex || data.uv_index || 2,
-          battery_voltage: data.batteryVoltage || data.battery_voltage || 12.5,
+          temperature: data.temperature ?? 25,
+          humidity: data.humidity ?? 60,
+          pressure: data.pressure ?? 1013,
+          wind_speed: data.windSpeed ?? data.wind_speed ?? 5,
+          rainfall: data.rainfall ?? 0,
+          soil_moisture: data.soilMoisture ?? data.soil_moisture ?? 50,
+          soil_temperature: data.soilTemperature ?? data.soil_temperature ?? 26,
+          light_level: data.lightIntensity ?? data.light_level ?? 70,
+          pm25: data.airQualityPM25 ?? data.pm25 ?? 60,
+          pm10: data.airQualityPM10 ?? data.pm10 ?? 120,
+          uv_index: data.uvIndex ?? data.uv_index ?? 2,
+          battery_voltage: data.batteryVoltage ?? data.battery_voltage ?? 12.5,
         });
         setLastUpdate(new Date().toLocaleTimeString());
       }
@@ -394,7 +394,7 @@ export default function AIHardwareAccelerator() {
         const data = await response.json();
         setRainPrediction(data);
         if (data.hardware_mode) setHardwareStatus((p) => ({ ...p, mode: data.hardware_mode }));
-        toast({ title: " Rain Prediction Complete", description: `${data.prediction.rain_probability}% via ${data.hardware_mode === "real_hardware" ? "COM4" : "Sim"}` });
+        toast({ title: " Rain Prediction Complete", description: `${data.prediction.rain_probability}% via ${data.hardware_mode === "real_hardware" ? "COM4" : "ML Model Cache"}` });
       } else {
         toast({ title: " Prediction Failed", description: "Could not reach FPGA", variant: "destructive" });
       }
@@ -422,7 +422,7 @@ export default function AIHardwareAccelerator() {
         const data = await response.json();
         setSensorFusion(data);
         if (data.hardware_mode) setHardwareStatus((p) => ({ ...p, mode: data.hardware_mode }));
-        toast({ title: "Crop Health Analysis Complete", description: `via ${data.hardware_mode === "real_hardware" ? "COM4 Hardware" : "Simulation"}` });
+        toast({ title: "Crop Health Analysis Complete", description: `via ${data.hardware_mode === "real_hardware" ? "COM4 Hardware" : "ML Prediction Cache"}` });
       } else {
         toast({ title: " Analysis Failed", variant: "destructive" });
       }

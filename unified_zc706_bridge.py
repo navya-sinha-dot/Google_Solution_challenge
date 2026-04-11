@@ -19,10 +19,29 @@ import sys
 import os
 from dotenv import load_dotenv
 from twilio.rest import Client
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 
 load_dotenv()
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+# ── Direct DB connection for MQTT → Neon PostgreSQL persistence ──
+_db_engine = None
+_DbSession = None
+
+def _get_db_session():
+    """Get a direct database session for storing MQTT data to Neon PostgreSQL"""
+    global _db_engine, _DbSession
+    if _db_engine is None:
+        db_url = os.getenv("DATABASE_URL")
+        if not db_url:
+            logger.error("❌ DATABASE_URL not set in .env – cannot persist MQTT data")
+            return None
+        logger.info(f"🗄️  Connecting to Neon DB: {db_url.split('@')[-1].split('/')[0]}")
+        _db_engine = create_engine(db_url, pool_pre_ping=True, pool_size=5, max_overflow=10)
+        _DbSession = sessionmaker(autocommit=False, autoflush=False, bind=_db_engine)
+    return _DbSession()
 
 class UnifiedZC706Bridge:
     def __init__(self, 
@@ -437,8 +456,78 @@ class UnifiedZC706Bridge:
             logger.error(f"❌ Error making decision: {e}")
             return "ERROR"
     
+    def store_to_database(self, sensor_reading: Dict[str, Any]) -> bool:
+        """
+        Directly store sensor data into Neon PostgreSQL.
+        This is the PRIMARY storage path – no HTTP intermediary.
+        """
+        try:
+            db = _get_db_session()
+            if db is None:
+                logger.error("❌ No DB session – skipping direct DB write")
+                return False
+
+            reading_datetime = datetime.fromtimestamp(sensor_reading["ts"])
+
+            query = text("""
+                INSERT INTO weather_data (
+                    station_id, timestamp,
+                    temperature, humidity, pressure,
+                    wind_speed, wind_direction, rainfall,
+                    soil_temperature, soil_moisture,
+                    pm25, pm10,
+                    uv_index, lux,
+                    battery_voltage, solar_voltage
+                ) VALUES (
+                    :station_id, :timestamp,
+                    :temperature, :humidity, :pressure,
+                    :wind_speed, :wind_direction, :rainfall,
+                    :soil_temperature, :soil_moisture,
+                    :pm25, :pm10,
+                    :uv_index, :lux,
+                    :battery_voltage, :solar_voltage
+                )
+            """)
+
+            params = {
+                'station_id':       sensor_reading["id"],
+                'timestamp':        reading_datetime,
+                'temperature':      sensor_reading["env"]["t"],
+                'humidity':         sensor_reading["env"]["h"],
+                'pressure':         sensor_reading["env"]["p"],
+                'wind_speed':       sensor_reading["wind"]["s"],
+                'wind_direction':   sensor_reading["wind"]["d"],
+                'rainfall':         sensor_reading["rain"],
+                'soil_temperature': sensor_reading["soil"]["t"],
+                'soil_moisture':    sensor_reading["soil"]["m"],
+                'pm25':             sensor_reading["air"]["pm25"],
+                'pm10':             sensor_reading["air"]["pm10"],
+                'uv_index':         sensor_reading["rad"]["uv"],
+                'lux':              sensor_reading["rad"]["lux"],
+                'battery_voltage':  sensor_reading["pwr"]["bat"],
+                'solar_voltage':    sensor_reading["pwr"]["sol"],
+            }
+
+            db.execute(query, params)
+            db.commit()
+            db.close()
+
+            logger.info(
+                f"🗄️  DB STORED: T={params['temperature']}°C, "
+                f"H={params['humidity']}%, P={params['pressure']}hPa, "
+                f"SM={params['soil_moisture']}%, Rain={params['rainfall']}mm, "
+                f"Wind={params['wind_speed']}m/s {params['wind_direction']}, "
+                f"PM2.5={params['pm25']}, UV={params['uv_index']}, "
+                f"Bat={params['battery_voltage']}V, Sol={params['solar_voltage']}V"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ Direct DB write failed: {e}")
+            return False
+
     def process_and_send(self):
-        """Process sensor data through accelerators and send to backend"""
+        """Process sensor data through accelerators, store in DB, and send to backend"""
         try:
             with self.sensor_data_lock:
                 # Only process if we have core data
@@ -489,6 +578,11 @@ class UnifiedZC706Bridge:
                     "wind_speed": sensor_reading["wind"]["s"],
                     "rainfall": sensor_reading["rain"],
                 }
+            
+            # ── PRIMARY: Store directly to Neon PostgreSQL ──
+            db_stored = self.store_to_database(sensor_reading)
+            if not db_stored:
+                logger.warning("⚠️  Direct DB storage failed, will try HTTP fallback")
             
             # Process through FPGA accelerators
             logger.info(f"📊 Processing sensor batch through ZC706 FPGA accelerators...")
@@ -546,13 +640,18 @@ class UnifiedZC706Bridge:
             # Make traditional AI decision (fallback)
             decision = self.make_decision(sensor_dict, accel_results)
             
-            # Send to backend with LLM analysis included
+            # ── SECONDARY: Also send to backend HTTP endpoint ──
             sensor_reading["llm_analysis"] = llm_analysis if llm_analysis else {}
             sensor_reading["accelerator_results"] = accel_results
             
-            logger.info(f"📤 Sending to backend: {self.backend_url}")
-            response = requests.post(self.backend_url, json=sensor_reading, timeout=5)
-            response.raise_for_status()
+            try:
+                logger.info(f"📤 Sending to backend: {self.backend_url}")
+                response = requests.post(self.backend_url, json=sensor_reading, timeout=5)
+                response.raise_for_status()
+            except requests.exceptions.ConnectionError:
+                logger.warning(f"⚠️  Cannot connect to backend HTTP (data already in DB)")
+            except Exception as e:
+                logger.warning(f"⚠️  HTTP backend error: {e} (data already in DB)")
             
             logger.info(f"✅ Sent: T={sensor_reading['env']['t']}°C, "
                        f"H={sensor_reading['env']['h']}%, "
@@ -561,8 +660,6 @@ class UnifiedZC706Bridge:
             
             self.last_backend_send_time = time.time()
             
-        except requests.exceptions.ConnectionError:
-            logger.warning(f"⚠️  Cannot connect to backend")
         except Exception as e:
             logger.error(f"❌ Error in process_and_send: {e}")
     
@@ -596,7 +693,7 @@ class UnifiedZC706Bridge:
 def main():
     """Run the unified bridge"""
     # Configuration
-    mqtt_broker = "192.168.137.83"
+    mqtt_broker = "10.186.37.61"
     mqtt_port = 1883
     backend_url = "http://localhost:8000/api/sensors/ingest"
     station_id = "WS01"

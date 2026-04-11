@@ -3,7 +3,7 @@ LoRa Sensor Data Endpoints
 Handles data reception from Raspberry Pi via HTTP (LoRa gateway)
 """
 
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, HTTPException, Query, Depends, Body
 from sqlalchemy import text
 from datetime import datetime
 from typing import List, Dict, Any
@@ -514,3 +514,108 @@ async def get_all_stations(db=Depends(get_db)) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error retrieving stations: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/trends/store")
+async def store_trends(request_data: Dict[str, Any] = Body(...), db=Depends(get_db)) -> Dict[str, Any]:
+    """
+    Store computed trend data into the trends table.
+    Called by the frontend Trends page on every refresh cycle.
+
+    Expected JSON:
+    {
+        "station_id": "WS01",
+        "trends": [
+            { "metric": "temperature", "direction": "rising", "rate": 0.12, "avg": 25.3, "min": 20.1, "max": 31.2 },
+            { "metric": "humidity",    "direction": "falling","rate": -0.05,"avg": 62.0, "min": 45.0, "max": 78.0 },
+            { "metric": "rainfall",    "direction": "stable", "rate": 0.0,  "avg": 0.3,  "min": 0.0,  "max": 1.5  }
+        ]
+    }
+    """
+    try:
+        station_id = request_data.get("station_id", "WS01")
+        trends = request_data.get("trends", [])
+        stored = 0
+
+        for trend in trends:
+            metric = trend.get("metric", "unknown")
+            direction = trend.get("direction", "stable")
+            rate = trend.get("rate", 0.0)
+            # Confidence based on data availability — higher if rate is stronger
+            confidence = min(1.0, abs(rate) * 5) if rate else 0.5
+
+            query = text("""
+                INSERT INTO trends (
+                    station_id, metric, period,
+                    trend_direction, trend_rate, confidence,
+                    start_timestamp, end_timestamp
+                ) VALUES (
+                    :station_id, :metric, :period,
+                    :direction, :rate, :confidence,
+                    NOW() - INTERVAL '24 hours', NOW()
+                )
+            """)
+
+            db.execute(query, {
+                "station_id": station_id,
+                "metric": metric,
+                "period": "daily",
+                "direction": direction,
+                "rate": rate,
+                "confidence": confidence,
+            })
+            stored += 1
+
+        db.commit()
+        logger.info(f"📈 Stored {stored} trend records for {station_id}")
+
+        return {
+            "status": "success",
+            "stored": stored,
+            "station_id": station_id,
+        }
+
+    except Exception as e:
+        logger.error(f"Error storing trends: {e}")
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/trends/{station_id}")
+async def get_trends(station_id: str, db=Depends(get_db)) -> Dict[str, Any]:
+    """
+    Get latest computed trends for a station.
+    Returns the most recent trend entry for each metric.
+    """
+    try:
+        query = text("""
+            SELECT DISTINCT ON (metric)
+                metric, trend_direction, trend_rate, confidence,
+                start_timestamp, end_timestamp
+            FROM trends
+            WHERE station_id = :station_id
+            ORDER BY metric, end_timestamp DESC
+        """)
+        results = db.execute(query, {"station_id": station_id}).fetchall()
+
+        trends = []
+        for row in results:
+            trends.append({
+                "metric": row[0],
+                "direction": row[1],
+                "rate": float(row[2]) if row[2] else 0,
+                "confidence": float(row[3]) if row[3] else 0,
+                "start": row[4].isoformat() if row[4] else None,
+                "end": row[5].isoformat() if row[5] else None,
+            })
+
+        return {
+            "station_id": station_id,
+            "trends": trends,
+            "count": len(trends),
+        }
+
+    except Exception as e:
+        logger.error(f"Error retrieving trends: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+

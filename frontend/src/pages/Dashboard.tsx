@@ -112,18 +112,18 @@ export default function Dashboard() {
           console.log(' Sensor API Response:', data);
           setConnectionStatus(true);
           const mappedData = {
-            temperature: data.temperature || 25,
-            humidity: data.humidity || 60,
-            pressure: data.pressure || 1013,
-            wind_speed: data.windSpeed || data.wind_speed || 5,
-            rainfall: data.rainfall || 0,
-            soil_moisture: data.soilMoisture || data.soil_moisture || 50,
-            soil_temperature: data.soilTemperature || data.soil_temperature || 26,
-            light_level: data.lightIntensity || data.light_level || 70,
-            pm25: data.airQualityPM25 || data.pm25 || 60,
-            pm10: data.airQualityPM10 || data.pm10 || 120,
-            uv_index: data.uvIndex || data.uv_index || 2,
-            battery_voltage: data.batteryVoltage || data.battery_voltage || 12.5,
+            temperature: data.temperature ?? 25,
+            humidity: data.humidity ?? 60,
+            pressure: data.pressure ?? 1013,
+            wind_speed: data.windSpeed ?? data.wind_speed ?? 5,
+            rainfall: data.rainfall ?? 0,
+            soil_moisture: data.soilMoisture ?? data.soil_moisture ?? 50,
+            soil_temperature: data.soilTemperature ?? data.soil_temperature ?? 26,
+            light_level: data.lightIntensity ?? data.light_level ?? 70,
+            pm25: data.airQualityPM25 ?? data.pm25 ?? 60,
+            pm10: data.airQualityPM10 ?? data.pm10 ?? 120,
+            uv_index: data.uvIndex ?? data.uv_index ?? 2,
+            battery_voltage: data.batteryVoltage ?? data.battery_voltage ?? 12.5,
           };
           console.log(' Mapped sensor data:', mappedData);
           setCurrentSensorData(mappedData);
@@ -210,7 +210,7 @@ export default function Dashboard() {
 
   const radiationLightParams = [
     { icon: <Sun className="w-5 h-5" />, labelKey: 'uv_index', value: displayUVIndex, unit: '', status: getParameterStatus('uvIndex', displayUVIndex) },
-    { icon: <Lightbulb className="w-5 h-5" />, labelKey: 'ambient_light', value: (displayLightLevel / 1000).toFixed(1), unit: 'klux', status: 'normal' as const },
+    { icon: <Lightbulb className="w-5 h-5" />, labelKey: 'ambient_light', value: displayLightLevel, unit: 'lux', status: 'normal' as const },
   ];
 
   const airSoilParams = [

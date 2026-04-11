@@ -11,7 +11,7 @@ from datetime import datetime
 from paho.mqtt.client import Client, CallbackAPIVersion
 
 # Configuration
-BROKER_HOST = "192.168.137.83"
+BROKER_HOST = "10.186.37.61"
 BROKER_PORT = 1883
 TOPIC = "farm/sensors/complete"
 STATION_ID = "ESP32_01"

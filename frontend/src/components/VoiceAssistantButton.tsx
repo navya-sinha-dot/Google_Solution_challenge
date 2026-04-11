@@ -17,6 +17,7 @@ export function VoiceAssistantButton() {
   const [showModal, setShowModal] = useState(false);
   const [responses, setResponses] = useState<string[]>([]);
   const [micPermission, setMicPermission] = useState<'granted' | 'denied' | 'prompt' | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Request microphone permission on mount
   useEffect(() => {
@@ -43,6 +44,7 @@ export function VoiceAssistantButton() {
   }, [transcript, isListening, clearTranscript]);
 
   const handleVoiceCommand = async (text: string) => {
+    setIsProcessing(true);
     try {
       // Send to backend /api/chat endpoint for generic AI response
       const response = await fetch("http://localhost:8000/api/chat", {
@@ -66,6 +68,8 @@ export function VoiceAssistantButton() {
       setResponses((prev) => [...prev, `[Supervisor Agent] ${fallback}`]);
       speak('Supervisor Agent says: ' + fallback);
       console.error('Error handling voice command:', err);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -173,39 +177,49 @@ export function VoiceAssistantButton() {
               )}
 
               {/* Status */}
-              <div className="text-center">
+              <div className="text-center py-4">
                 {isListening && (
-                  <div className="space-y-3">
-                    <div className="flex justify-center gap-2">
-                      <div className="w-3 h-3 bg-primary rounded-full animate-pulse"></div>
-                      <div className="w-3 h-3 bg-primary/60 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                      <div className="w-3 h-3 bg-primary/30 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                  <div className="space-y-4">
+                    <div className="flex justify-center items-center gap-3 h-8">
+                      <div className="w-3 h-3 bg-primary rounded-full animate-bounce"></div>
+                      <div className="w-3 h-3 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-3 h-3 bg-primary/30 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
                     </div>
-                    <p className="text-sm font-medium text-primary">{t('voice_listening')}</p>
+                    <p className="text-sm font-bold text-primary tracking-wide uppercase">{t('voice_listening')}</p>
                   </div>
                 )}
 
                 {isSpeaking && (
-                  <div className="space-y-3">
-                    <div className="flex justify-center gap-1">
-                      {[0, 1, 2].map((i) => (
+                  <div className="space-y-4">
+                    <div className="flex justify-center gap-1 items-end h-10">
+                      {[0, 1, 2, 3, 4].map((i) => (
                         <div
                           key={i}
-                          className="w-2 h-10 bg-primary rounded-full animate-pulse"
-                          style={{ animationDelay: `${i * 150}ms` }}
+                          className="w-1.5 bg-primary rounded-full animate-pulse"
+                          style={{ 
+                            height: `${20 + Math.random() * 20}px`,
+                            animationDuration: `${0.5 + Math.random()}s`,
+                            animationDelay: `${i * 100}ms` 
+                          }}
                         ></div>
                       ))}
                     </div>
-                    <p className="text-sm font-bold text-primary animate-pulse"> SkyView is speaking...</p>
+                    <p className="text-sm font-bold text-primary animate-pulse tracking-wide uppercase"> SkyView is speaking...</p>
                   </div>
                 )}
 
-                {!isListening && !isSpeaking && transcript && (
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-success/20 flex items-center justify-center">
-                      <Loader className="w-5 h-5 text-success animate-spin" />
+                {isProcessing && (
+                  <div className="flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-300">
+                    <div className="relative">
+                      <div className="w-16 h-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin"></div>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Loader className="w-8 h-8 text-primary animate-pulse" />
+                      </div>
                     </div>
-                    <p className="text-sm font-medium text-success">Processing atmospheric query...</p>
+                    <div className="space-y-1">
+                      <p className="text-base font-black text-primary animate-pulse tracking-tighter uppercase">Agent is Thinking...</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-widest opacity-60">Consulting Knowledge Base</p>
+                    </div>
                   </div>
                 )}
               </div>

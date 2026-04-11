@@ -4,7 +4,7 @@ import { FarmBackground, GlassSection } from "@/components/FarmTheme";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { useVoiceAssistant } from "@/hooks/useVoiceAssistant";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Send, Mic, Volume2, Loader2 } from "lucide-react";
+import { Send, Mic, Volume2, VolumeX, Loader2 } from "lucide-react";
 
 const translations = {
   en: {
@@ -45,7 +45,7 @@ export default function Chat() {
   const [loading, setLoading] = useState(false);
   const [isSpeakingResponse, setIsSpeakingResponse] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { isListening, transcript, startListening, stopListening, speak, isSpeaking } = useVoiceAssistant();
+  const { isListening, transcript, startListening, stopListening, speak, isSpeaking, clearTranscript, stopSpeaking } = useVoiceAssistant();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -57,9 +57,15 @@ export default function Chat() {
 
   useEffect(() => {
     if (transcript && !isListening) {
-      setInput(transcript);
+      // Auto-send the voice command immediately when speaking finishes
+      const textToSend = transcript;
+      sendMessage(textToSend);
+      // Wait a bit and clear to prevent duplicate triggers
+      setTimeout(() => {
+        clearTranscript();
+      }, 500);
     }
-  }, [transcript, isListening]);
+  }, [transcript, isListening, clearTranscript]);
 
   const sendMessage = async (text: string) => {
     if (!text.trim()) return;
@@ -78,7 +84,8 @@ export default function Chat() {
 
     try {
       // Call the chat API
-      const response = await fetch("http://localhost:8000/api/chat", {
+      const API_URL = import.meta.env.VITE_API_URL || import.meta.env.REACT_APP_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_URL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text })
@@ -190,9 +197,33 @@ export default function Chat() {
               ))
             )}
             {loading && (
-              <div style={{ textAlign: 'center', marginTop: '16px', color: isDark ? '#6A8A6A' : '#888' }}>
-                <Loader2 style={{ width: '20px', height: '20px', animation: 'spin 1s linear infinite', display: 'inline-block' }} />
-                <p>{t.thinking}</p>
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column',
+                gap: '8px', 
+                marginLeft: '16px', 
+                marginTop: '16px', 
+                padding: '16px 20px', 
+                borderRadius: '16px', 
+                background: isDark ? 'rgba(46,204,113,0.15)' : 'rgba(46,204,113,0.08)', 
+                border: `1px solid ${isDark ? 'rgba(46,204,113,0.3)' : 'rgba(46,204,113,0.2)'}`,
+                maxWidth: 'max-content',
+                animation: 'pulse 2s infinite ease-in-out'
+              }}>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  <div className="typing-dot"></div>
+                  <div className="typing-dot"></div>
+                  <div className="typing-dot"></div>
+                </div>
+                <span style={{ 
+                  fontSize: '11px', 
+                  fontWeight: 800, 
+                  color: '#2ECC71', 
+                  textTransform: 'uppercase', 
+                  letterSpacing: '1px' 
+                }}>
+                  {t.thinking}
+                </span>
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -238,6 +269,32 @@ export default function Chat() {
               <Mic style={{ width: '18px', height: '18px' }} />
               {isListening ? 'Stop' : t.listen}
             </button>
+            {isSpeakingResponse && (
+              <button
+                type="button"
+                onClick={() => {
+                  stopSpeaking();
+                  setIsSpeakingResponse(false);
+                }}
+                style={{
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: '#e67e22',
+                  color: 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  transition: 'all 0.3s'
+                }}
+                title="Stop Speaking"
+              >
+                <VolumeX style={{ width: '18px', height: '18px' }} />
+              </button>
+            )}
             <button
               type="submit"
               style={{
@@ -268,6 +325,19 @@ export default function Chat() {
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+        .typing-dot {
+          width: 10px;
+          height: 10px;
+          background-color: #2ECC71;
+          border-radius: 50%;
+          animation: typingBlink 1.4s infinite ease-in-out both;
+        }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes typingBlink {
+          0%, 80%, 100% { transform: scale(0); opacity: 0.5; }
+          40% { transform: scale(1); opacity: 1; }
         }
       `}</style>
     </div>

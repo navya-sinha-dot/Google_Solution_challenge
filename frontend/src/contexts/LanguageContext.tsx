@@ -197,7 +197,7 @@ const translations: Translations = {
   export_pdf: { en: 'Export to PDF', hi: 'PDF में निर्यात करें', te: 'PDF కు ఎగుమతి చేయండి', ta: 'PDF ஆக ஏற்றுமதி செய்', mr: 'PDF मध्ये एक्सपोर्ट करा', gu: 'PDF માં નિકાસ કરો', bn: 'PDF তে এক্সপোর্ট করুন', kn: 'PDF ಗೆ ರಫ್ತು ಮಾಡಿ', ml: 'PDF ലേക്ക് ഡൗൺലോഡ്', pa: 'PDF ਵਿੱਚ ਨਿਰਯਾਤ ਕਰੋ' },
 
   // AI Accelerator
-  accel_simulation: { en: 'Simulation', hi: 'सिमुलेशन', te: 'సిమ్యులేషన్', ta: 'உருவகப்படுத்தல்', mr: 'सिम्युलेशन', gu: 'સિમ્યુલેશન', bn: 'সিমুলেশন', kn: 'ಸಿಮ್ಯುಲೇಶನ್', ml: 'സിമുലേഷൻ', pa: 'ਸਿਮੂਲੇਸ਼ਨ' },
+  accel_intelligent_mode: { en: 'Intelligent Mode (Edge AI)', hi: 'इंटेलिजेंट मोड (एज एआई)', te: 'ఇంటెలిజెంట్ మోడ్ (ఎడ్జ్ AI)', ta: 'அறிவுத்திறன் முறை (எட்ஜ் AI)', mr: 'इंटेलिजेंट मोड (एज एआय)', gu: 'ઇન્ટેલિજન્ટ મોડ (એજ AI)', bn: 'ইন্টেলিজেন্ট মোড (এজ এআই)', kn: 'ಇಂಟೆಲಿಜೆಂಟ್ ಮೋಡ್ (ಎಡ್ಜ್ AI)', ml: 'ഇന്റലിജന്റ് മോഡ് (എഡ്ജ് AI)', pa: 'ਇੰਟੈਲੀਜੈਂਟ ਮੋਡ (ਐਜ ਏਆਈ)' },
   accel_connected: { en: 'Connected', hi: 'जुड़ा हुआ', te: 'కనెక్ట్ అయింది', ta: 'இணைக்கப்பட்டது', mr: 'जोडलेले', gu: 'જોડાયેલ', bn: 'সংযুক্ত', kn: 'ಸಂಪರ್ಕಿತ', ml: 'ബന്ധിപ്പിച്ചു', pa: 'ਕਨੈਕਟ ਹੈ' },
   accel_disconnected: { en: 'Disconnected', hi: 'डिस्कनेक्ट', te: 'డిస్‌కనెక్ట్', ta: 'துண்டிக்கப்பட்டது', mr: 'डिस्कनेक्ट', gu: 'ડિસ્કનેક્ટ', bn: 'সংযোগ বিচ্ছিন্ন', kn: 'ಸಂಪರ್ಕ ತಪ್ಪಿದೆ', ml: 'ബന്ധം വിച്ഛേദിച്ചു', pa: 'ਡਿਸਕਨੈਕਟ' },
 
@@ -287,11 +287,11 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang);
     localStorage.setItem('app_language', lang);
-    
+
     // Manage Google Translate cookie for global transformation
     const cookieValue = lang === 'en' ? '' : `/en/${lang}`;
     document.cookie = `googtrans=${cookieValue}; path=/;`;
-    
+
     // Small delay before reload for state persistence
     setTimeout(() => {
       window.location.reload();
@@ -301,7 +301,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const t = useCallback((key: string): string => {
     const entry = translations[key];
     if (!entry) return key;
-    
+
     // If a non-English language is selected, we provide the English label
     // so that Google Translate can perform the translation on-the-fly.
     // This prevents the "double translation" issue where manual Marathi
@@ -309,7 +309,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     if (language !== 'en') {
       return entry['en'] || key;
     }
-    
+
     return entry[language] || entry['en'] || key;
   }, [language]);
 
