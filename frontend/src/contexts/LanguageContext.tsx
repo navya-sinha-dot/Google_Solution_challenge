@@ -206,6 +206,60 @@ const translations: Translations = {
   voice_subtitle: { en: 'AI-Powered Atmospheric Assistant', hi: 'AI-संचालित वायुमंडलीय सहायक', te: 'AI-ఆధారిత వాతావరణ సహాయకుడు', ta: 'AI-இயக்கும் வளிமண்டல உதவியாளர்', mr: 'AI-चालित वातावरण सहाय्यक', gu: 'AI-સંચાલિત વાતાવરણ સહાયક', bn: 'AI-চালিত বায়ুমণ্ডলীয় সহকারী', kn: 'AI-ಚಾಲಿತ ವಾತಾವರಣ ಸಹಾಯಕ', ml: 'AI-പ്രവർത്തിത അന്തരീക്ഷ സഹായി', pa: 'AI-ਸੰਚਾਲਿਤ ਵਾਯੂਮੰਡਲ ਸਹਾਇਕ' },
   voice_listening: { en: 'Listening...', hi: 'सुन रहा है...', te: 'వింటోంది...', ta: 'கேட்கிறது...', mr: 'ऐकत आहे...', gu: 'સાંભળી રહ્યું છે...', bn: 'শুনছে...', kn: 'ಕೇಳುತ್ತಿದೆ...', ml: 'കേൾക്കുന്നു...', pa: 'ਸੁਣ ਰਿਹਾ ਹੈ...' },
   voice_start: { en: 'START CONSULTATION', hi: 'परामर्श शुरू करें', te: 'సంప్రదింపు ప్రారంభించండి', ta: 'ஆலோசனை தொடங்கு', mr: 'सल्लामसलत सुरू करा', gu: 'પરામર્શ શરૂ કરો', bn: 'পরামর্শ শুরু করুন', kn: 'ಸಮಾಲೋಚನೆ ಪ್ರಾರಂಭಿಸಿ', ml: 'കൺസൾട്ടേഷൻ ആരംഭിക്കുക', pa: 'ਸਲਾਹ-ਮਸ਼ਵਰਾ ਸ਼ੁਰੂ ਕਰੋ' },
+
+  // Signup page (aliased keys used by components)
+  signup_full_name: { en: 'Full Name' },
+  signup_land_size: { en: 'Land Size (Acres)' },
+  signup_crops: { en: 'Crops Cultivated' },
+  signup_complete: { en: 'Complete Registration' },
+  signup_send_code: { en: 'Send Verification Code' },
+  have_account: { en: 'Already have an account?' },
+
+  // Profile page
+  profile_land_size: { en: 'Land Size' },
+  profile_crops_grown: { en: 'Crops Grown' },
+  profile_tap_to_add: { en: 'Tap pencil to add' },
+  profile_loading_schemes: { en: 'Loading schemes...' },
+  profile_required_docs: { en: 'Required Documents' },
+  profile_apply_btn: { en: 'Apply & Upload Documents' },
+
+  // Mandi page (aliased keys)
+  mandi_search_placeholder: { en: 'Search commodity, market, state...' },
+  mandi_all_states: { en: 'All States' },
+  mandi_all_commodities: { en: 'All Commodities' },
+  mandi_total_entries: { en: 'Total Entries' },
+  mandi_highest_price: { en: 'Highest Price' },
+  mandi_lowest_price: { en: 'Lowest Price' },
+  mandi_avg_price: { en: 'Avg Modal Price' },
+  mandi_commodity_prices: { en: 'Commodity Prices' },
+  mandi_fetching: { en: 'Fetching rates...' },
+  mandi_no_data: { en: 'No data found' },
+  mandi_try_filters: { en: 'Try adjusting your filters' },
+  mandi_col_commodity: { en: 'Commodity' },
+  mandi_col_variety: { en: 'Variety' },
+  mandi_col_market: { en: 'Market' },
+  mandi_col_state: { en: 'State' },
+  mandi_col_modal_price: { en: 'Modal Price (₹/qtl)' },
+  mandi_col_min: { en: 'Min Price' },
+  mandi_col_max: { en: 'Max Price' },
+  mandi_col_date: { en: 'Date' },
+
+  // Reports page (aliased keys)
+  reports_subtitle: { en: 'Comprehensive AI-powered analysis of your farm data' },
+  reports_generating: { en: 'Generating...' },
+  reports_generate_btn: { en: 'Generate AI Farm Report' },
+  reports_export_pdf: { en: 'Export to PDF' },
+  reports_generating_msg: { en: 'Generating your report...' },
+  reports_analyzing: { en: 'Analyzing sensor readings and generating recommendations.' },
+  reports_ready_title: { en: 'Report Ready' },
+  reports_ready_desc: { en: 'Your comprehensive farm report has been generated.' },
+
+  // AI Accelerator (aliased keys)
+  accel_sending: { en: 'Processing...' },
+  accel_predict_rain: { en: 'Predict Rain' },
+  accel_health_check: { en: 'Run Health Check' },
+  accel_run_analysis: { en: 'Run Analysis' },
+  accel_hardware: { en: 'Hardware' },
 };
 
 interface LanguageContextType {

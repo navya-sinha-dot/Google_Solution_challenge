@@ -24,10 +24,10 @@ const SPECS = [
 
 const FEATURES = [
   'Real-time streaming to your dashboard',
-  'FPGA-accelerated rain prediction & sensor fusion',
+  'FPGA-accelerated rain prediction & crop health analysis',
   'Automated alerts for critical farm conditions',
   'LangGraph multi-agent AI analysis',
-  'Works with any Indian mandi for crop pricing',
+  'Works with any Indian market for crop pricing',
   'Voice assistant integration',
 ];
 

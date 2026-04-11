@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@studio-freight/lenis": "^1.0.42",
     "firebase": "^12.11.0"
   }
 }

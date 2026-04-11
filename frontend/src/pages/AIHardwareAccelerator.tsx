@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
-import { CloudRain, Leaf, AlertCircle, Cpu, Wifi, WifiOff } from "lucide-react";
+import { CloudRain, Leaf, Droplets, Cpu, Wifi, WifiOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { FarmBackground, GlassSection } from "@/components/FarmTheme";
@@ -422,7 +422,7 @@ export default function AIHardwareAccelerator() {
         const data = await response.json();
         setSensorFusion(data);
         if (data.hardware_mode) setHardwareStatus((p) => ({ ...p, mode: data.hardware_mode }));
-        toast({ title: " Sensor Fusion Complete", description: `via ${data.hardware_mode === "real_hardware" ? "COM4 Hardware" : "Simulation"}` });
+        toast({ title: "Crop Health Analysis Complete", description: `via ${data.hardware_mode === "real_hardware" ? "COM4 Hardware" : "Simulation"}` });
       } else {
         toast({ title: " Analysis Failed", variant: "destructive" });
       }
@@ -450,7 +450,7 @@ export default function AIHardwareAccelerator() {
         const data = await response.json();
         setCombinedAnalysis(data);
         if (data.hardware_mode) setHardwareStatus((p) => ({ ...p, mode: data.hardware_mode }));
-        toast({ title: " Combined Analysis Complete" });
+        toast({ title: "Irrigation Analysis Complete" });
       } else {
         toast({ title: " Analysis Failed", variant: "destructive" });
       }
@@ -550,14 +550,14 @@ export default function AIHardwareAccelerator() {
           </GlassSection>
           <GlassSection style={{ padding: "2rem", textAlign: "center" }}>
             <Leaf style={{ width: "2rem", height: "2rem", color: "#27AE60", margin: "0 auto 1rem" }} />
-            <h3 style={{ fontSize: "1.125rem", fontWeight: "bold", color: isDark ? "#FFFFFF" : "#1B3A20", marginBottom: "1rem" }}>Sensor Fusion</h3>
+            <h3 style={{ fontSize: "1.125rem", fontWeight: "bold", color: isDark ? "#FFFFFF" : "#1B3A20", marginBottom: "1rem" }}>Crop Health</h3>
             <Button onClick={runSensorFusion} disabled={loadingFusion} style={{ width: "100%", backgroundColor: "#2ECC71", color: "white", padding: "0.75rem" }}>
               {loadingFusion ? t('accel_sending') : t('accel_health_check')}
             </Button>
           </GlassSection>
           <GlassSection style={{ padding: "2rem", textAlign: "center" }}>
-            <AlertCircle style={{ width: "2rem", height: "2rem", color: "#8B5CF6", margin: "0 auto 1rem" }} />
-            <h3 style={{ fontSize: "1.125rem", fontWeight: "bold", color: isDark ? "#FFFFFF" : "#1B3A20", marginBottom: "1rem" }}>Full Analysis</h3>
+            <Droplets style={{ width: "2rem", height: "2rem", color: "#8B5CF6", margin: "0 auto 1rem" }} />
+            <h3 style={{ fontSize: "1.125rem", fontWeight: "bold", color: isDark ? "#FFFFFF" : "#1B3A20", marginBottom: "1rem" }}>Irrigation Model</h3>
             <Button onClick={runCombinedAnalysis} disabled={loadingCombined} style={{ width: "100%", backgroundColor: "#2ECC71", color: "white", padding: "0.75rem" }}>
               {loadingCombined ? t('accel_sending') : t('accel_run_analysis')}
             </Button>
@@ -592,7 +592,7 @@ export default function AIHardwareAccelerator() {
           </GlassSection>
         )}
 
-        {/* ─── Sensor Fusion Results ─── */}
+        {/* ─── Crop Health Results ─── */}
         {sensorFusion && (
           <GlassSection style={{ marginBottom: "1.5rem", padding: "2rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
@@ -622,11 +622,11 @@ export default function AIHardwareAccelerator() {
           </GlassSection>
         )}
 
-        {/* ─── Combined Analysis Results ─── */}
+        {/* ─── Irrigation Model Results ─── */}
         {combinedAnalysis && (
           <GlassSection style={{ padding: "2rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-              <h3 style={{ fontSize: "1.25rem", fontWeight: "bold", color: isDark ? "#FFFFFF" : "#1B3A20" }}> AI Recommendation</h3>
+              <h3 style={{ fontSize: "1.25rem", fontWeight: "bold", color: isDark ? "#FFFFFF" : "#1B3A20" }}>Irrigation Recommendation</h3>
               {modeBadge(combinedAnalysis.hardware_mode)}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "1.5rem", marginBottom: "1.5rem" }}>

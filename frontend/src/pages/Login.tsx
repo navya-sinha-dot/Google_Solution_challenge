@@ -69,7 +69,15 @@ export default function Login() {
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh', overflow: 'hidden' }}>
-      <FarmBackground />
+      <div
+        style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: 'url(/frames/ezgif-frame-284.jpg)',
+          backgroundSize: '100% 100%',
+          backgroundPosition: 'center',
+          filter: 'brightness(0.7)'
+        }}
+      />
 
       {/* Top controls */}
       <div style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 50, display: 'flex', gap: '8px' }}>
@@ -188,37 +196,37 @@ export default function Login() {
             )}
 
             {!otpSent ? (
-               <Button
-                  type="button" onClick={handleSendOtp} disabled={isLoading || !phone}
-                  style={{
-                    width: '100%', height: '48px', borderRadius: '10px',
-                    background: 'linear-gradient(135deg, #2ECC71, #1a9e52)',
-                    color: 'white', fontSize: '15px', fontWeight: 700,
-                    fontFamily: "'Nunito', sans-serif",
-                    border: 'none', cursor: 'pointer',
-                    boxShadow: '0 4px 16px rgba(46,204,113,0.35)',
-                    marginTop: '4px',
-                  }}
-                >
-                  {isLoading ? t('sending_otp') : t('send_otp')}
-                </Button>
+              <Button
+                type="button" onClick={handleSendOtp} disabled={isLoading || !phone}
+                style={{
+                  width: '100%', height: '48px', borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #2ECC71, #1a9e52)',
+                  color: 'white', fontSize: '15px', fontWeight: 700,
+                  fontFamily: "'Nunito', sans-serif",
+                  border: 'none', cursor: 'pointer',
+                  boxShadow: '0 4px 16px rgba(46,204,113,0.35)',
+                  marginTop: '4px',
+                }}
+              >
+                {isLoading ? t('sending_otp') : t('send_otp')}
+              </Button>
             ) : (
-                <Button
-                  type="button" onClick={handleLogin} disabled={isLoading || !otp}
-                  style={{
-                    width: '100%', height: '48px', borderRadius: '10px',
-                    background: 'linear-gradient(135deg, #2ECC71, #1a9e52)',
-                    color: 'white', fontSize: '15px', fontWeight: 700,
-                    fontFamily: "'Nunito', sans-serif",
-                    border: 'none', cursor: 'pointer',
-                    boxShadow: '0 4px 16px rgba(46,204,113,0.35)',
-                    marginTop: '4px',
-                  }}
-                >
-                  {isLoading ? t('verifying') : t('login_securely')}
-                </Button>
+              <Button
+                type="button" onClick={handleLogin} disabled={isLoading || !otp}
+                style={{
+                  width: '100%', height: '48px', borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #2ECC71, #1a9e52)',
+                  color: 'white', fontSize: '15px', fontWeight: 700,
+                  fontFamily: "'Nunito', sans-serif",
+                  border: 'none', cursor: 'pointer',
+                  boxShadow: '0 4px 16px rgba(46,204,113,0.35)',
+                  marginTop: '4px',
+                }}
+              >
+                {isLoading ? t('verifying') : t('login_securely')}
+              </Button>
             )}
-            
+
           </form>
 
           {/* Signup link */}

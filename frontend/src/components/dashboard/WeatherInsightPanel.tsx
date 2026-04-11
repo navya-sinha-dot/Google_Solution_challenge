@@ -31,7 +31,7 @@ export function WeatherInsightPanel() {
   const parseRecommendations = (text: string): Recommendation[] => {
     const lines = text.split('\n').filter(line => line.trim());
     const parsed: Recommendation[] = [];
-    
+
     lines.forEach((line, idx) => {
       const match = line.match(/^(\d+)\.\s*(.+)/);
       if (match) {
@@ -47,7 +47,7 @@ export function WeatherInsightPanel() {
         parsed.push({ number, text, priority });
       }
     });
-    
+
     return parsed;
   };
 
@@ -89,21 +89,21 @@ export function WeatherInsightPanel() {
       }
 
       const responseText = data.response || 'No insights available';
-      setInsight({ 
-        insight: responseText, 
+      setInsight({
+        insight: responseText,
         recommendation: responseText
       });
-      
+
       // Parse recommendations for visual display
       const parsed = parseRecommendations(responseText);
       setRecommendations(parsed);
-      
+
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : t('insight_fetch_error');
       console.error(' Weather insight fetch error:', errorMessage);
       setError(errorMessage);
-      setInsight({ 
-        insight: 'Unable to generate insights', 
+      setInsight({
+        insight: 'Unable to generate insights',
         recommendation: `Backend service error: ${errorMessage}. Try refreshing.`
       });
       toast.error(errorMessage);
@@ -124,7 +124,7 @@ export function WeatherInsightPanel() {
   };
 
   const getPriorityColor = (priority: string) => {
-    switch(priority) {
+    switch (priority) {
       case 'high': return isDark ? '#FF6B6B' : '#E53935';
       case 'medium': return isDark ? '#FFD93D' : '#F57C00';
       default: return isDark ? '#2ECC71' : '#43A047';
@@ -132,7 +132,7 @@ export function WeatherInsightPanel() {
   };
 
   const getPriorityBgColor = (priority: string) => {
-    switch(priority) {
+    switch (priority) {
       case 'high': return isDark ? 'rgba(255, 107, 107, 0.1)' : 'rgba(229, 57, 53, 0.08)';
       case 'medium': return isDark ? 'rgba(255, 217, 61, 0.1)' : 'rgba(245, 124, 0, 0.08)';
       default: return isDark ? 'rgba(46, 204, 113, 0.1)' : 'rgba(67, 160, 71, 0.08)';
@@ -209,7 +209,7 @@ export function WeatherInsightPanel() {
                 background: getPriorityColor(rec.priority),
                 flexShrink: 0,
               }} />
-              
+
               {/* Number circle */}
               <div style={{
                 width: '28px',

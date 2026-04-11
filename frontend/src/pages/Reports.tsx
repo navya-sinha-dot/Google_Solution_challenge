@@ -257,7 +257,7 @@ p,span,div,strong{color:#1a1a1a!important}
               borderBottom: '3px solid #2ECC71', marginBottom: 32,
             }}>
               <h1 style={{ fontSize: 26, fontWeight: 900, color: isDark ? '#A8D89A' : '#1B3A20', margin: '0 0 4px' }}>
-                 Daily Farm Intelligence Report
+                Daily Farm Intelligence Report
               </h1>
               <p style={{ color: isDark ? '#6A8A6A' : '#5A7A60', fontSize: 13, margin: '2px 0' }}>
                 Station: WS01 • {generatedAt}
@@ -267,7 +267,7 @@ p,span,div,strong{color:#1a1a1a!important}
                 background: 'rgba(46,204,113,0.12)', color: '#2E7D32',
                 fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, marginTop: 10,
               }}>
-                 AI-Verified • Live Sensor Data
+                AI-Verified • Live Sensor Data
               </span>
             </div>
 
@@ -353,7 +353,7 @@ p,span,div,strong{color:#1a1a1a!important}
                   </p>
                   {sensor.rainfall > 0 && (
                     <p style={{ fontSize: 12, color: '#2196F3', fontWeight: 600, marginTop: 8 }}>
-                       Recent rainfall of {sensor.rainfall.toFixed(1)} mm detected — factor into irrigation schedule.
+                      Recent rainfall of {sensor.rainfall.toFixed(1)} mm detected — factor into irrigation schedule.
                     </p>
                   )}
                 </div>

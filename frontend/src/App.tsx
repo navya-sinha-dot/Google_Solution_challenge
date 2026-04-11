@@ -36,125 +36,128 @@ function LoginRoute() {
   return <Navigate to={hardwareConnected ? "/dashboard" : "/hardware-setup"} replace />;
 }
 
+import { AnimatePresence, motion } from "framer-motion";
+import { useLocation } from "react-router-dom";
+
 const AppContent = () => {
   const { isAuthenticated } = useAuth();
   
   return (
     <>
       <Routes>
-                <Route path="/" element={<Landing />} />
-                <Route path="/login" element={<LoginRoute />} />
-                <Route path="/signup" element={<Signup />} />
+        <Route path="/" element={<Landing />} />
+        <Route path="/login" element={<LoginRoute />} />
+        <Route path="/signup" element={<Signup />} />
 
-                {/* Hardware onboarding — protected but no HardwareGate */}
-                <Route
-                  path="/hardware-setup"
-                  element={
-                    <ProtectedRoute>
-                      <HardwareSetup />
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/buy-hardware"
-                  element={
-                    <ProtectedRoute>
-                      <BuyHardware />
-                    </ProtectedRoute>
-                  }
-                />
+        {/* Hardware onboarding — protected but no HardwareGate */}
+        <Route
+          path="/hardware-setup"
+          element={
+            <ProtectedRoute>
+              <HardwareSetup />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/buy-hardware"
+          element={
+            <ProtectedRoute>
+              <BuyHardware />
+            </ProtectedRoute>
+          }
+        />
 
-                {/* Profile — protected, no HardwareGate (user needs to connect hardware here) */}
-                <Route
-                  path="/profile"
-                  element={
-                    <ProtectedRoute>
-                      <Profile />
-                    </ProtectedRoute>
-                  }
-                />
+        {/* Profile — protected, no HardwareGate (user needs to connect hardware here) */}
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          }
+        />
 
-                {/* Data pages — require hardware connection */}
-                <Route
-                  path="/dashboard"
-                  element={
-                    <ProtectedRoute>
-                      <HardwareGate>
-                        <Dashboard />
-                      </HardwareGate>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/trends"
-                  element={
-                    <ProtectedRoute>
-                      <HardwareGate>
-                        <Trends />
-                      </HardwareGate>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/reports"
-                  element={
-                    <ProtectedRoute>
-                      <HardwareGate>
-                        <Reports />
-                      </HardwareGate>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/advisor"
-                  element={
-                    <ProtectedRoute>
-                      <HardwareGate>
-                        <Advisor />
-                      </HardwareGate>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/overview"
-                  element={
-                    <ProtectedRoute>
-                      <HardwareGate>
-                        <SystemOverview />
-                      </HardwareGate>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/accelerator"
-                  element={
-                    <ProtectedRoute>
-                      <HardwareGate>
-                        <AIHardwareAccelerator />
-                      </HardwareGate>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/mandi"
-                  element={
-                    <ProtectedRoute>
-                      <HardwareGate>
-                        <MandiRates />
-                      </HardwareGate>
-                    </ProtectedRoute>
-                  }
-                />
+        {/* Data pages — require hardware connection */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <HardwareGate>
+                <Dashboard />
+              </HardwareGate>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/trends"
+          element={
+            <ProtectedRoute>
+              <HardwareGate>
+                <Trends />
+              </HardwareGate>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute>
+              <HardwareGate>
+                <Reports />
+              </HardwareGate>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/advisor"
+          element={
+            <ProtectedRoute>
+              <HardwareGate>
+                <Advisor />
+              </HardwareGate>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/overview"
+          element={
+            <ProtectedRoute>
+              <HardwareGate>
+                <SystemOverview />
+              </HardwareGate>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/accelerator"
+          element={
+            <ProtectedRoute>
+              <HardwareGate>
+                <AIHardwareAccelerator />
+              </HardwareGate>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/mandi"
+          element={
+            <ProtectedRoute>
+              <HardwareGate>
+                <MandiRates />
+              </HardwareGate>
+            </ProtectedRoute>
+          }
+        />
 
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-              {isAuthenticated && (
-                <>
-                  <VoiceAssistantButton />
-                  <CallAgentButton />
-                </>
-              )}
+        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+      {isAuthenticated && (
+        <>
+          <VoiceAssistantButton />
+          <CallAgentButton />
+        </>
+      )}
     </>
   );
 };

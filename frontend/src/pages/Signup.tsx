@@ -111,7 +111,14 @@ export default function Signup() {
 
     return (
         <div className="relative min-h-screen overflow-hidden flex items-center justify-center p-4">
-            <FarmBackground />
+            <div 
+                className="absolute inset-0 bg-cover bg-center" 
+                style={{ 
+                    backgroundImage: 'url(/frames/ezgif-frame-284.jpg)',
+                    backgroundSize: '100% 100%',
+                    filter: 'brightness(0.7)' 
+                }} 
+            />
 
             {/* Top controls */}
             <div className="absolute top-6 right-6 z-50 flex gap-4">
