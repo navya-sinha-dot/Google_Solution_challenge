@@ -15,7 +15,7 @@ import sys
 from datetime import datetime
 
 # Default values
-BROKER_HOST = "10.186.37.61"
+BROKER_HOST = "192.168.0.129"
 BROKER_PORT = 1883
 TOPIC = "farm/sensors/#"
 

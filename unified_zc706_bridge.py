@@ -693,7 +693,7 @@ class UnifiedZC706Bridge:
 def main():
     """Run the unified bridge"""
     # Configuration
-    mqtt_broker = "10.186.37.61"
+    mqtt_broker = "192.168.0.129"
     mqtt_port = 1883
     backend_url = "http://localhost:8000/api/sensors/ingest"
     station_id = "WS01"
