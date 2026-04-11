@@ -2097,6 +2097,192 @@ def _get_mandi_context() -> str:
     return "Live Mandi Rates:\n" + "\n".join(lines)
 
 
+# ============ WHATSAPP ALERT MONITORING ============
+
+# Configurable alert thresholds
+_alert_config = {
+    "recipients": os.getenv("TWILIO_ALERT_RECIPIENT", "").split(","),
+    "enabled": True,
+    "check_interval_seconds": 300,  # 5 minutes
+    "cooldown_minutes": 30,
+    "thresholds": {
+        "temperature_high": 40.0,
+        "temperature_low": 5.0,
+        "humidity_high": 90.0,
+        "humidity_low": 20.0,
+        "soil_moisture_low": 20.0,
+        "soil_moisture_high": 85.0,
+        "rainfall_high": 15.0,
+        "pm25_high": 150.0,
+        "wind_speed_high": 20.0,
+    },
+    "last_alert_times": {},  # Track cooldowns per alert type
+}
+
+
+class AlertConfigRequest(BaseModel):
+    recipients: Optional[list] = None
+    enabled: Optional[bool] = None
+    thresholds: Optional[dict] = None
+    cooldown_minutes: Optional[int] = None
+
+
+@app.post("/api/alerts/config")
+async def configure_alerts(config: AlertConfigRequest):
+    """Configure WhatsApp alert recipients, thresholds, and behavior."""
+    if config.recipients is not None:
+        _alert_config["recipients"] = [r.strip() for r in config.recipients if r.strip()]
+    if config.enabled is not None:
+        _alert_config["enabled"] = config.enabled
+    if config.thresholds is not None:
+        _alert_config["thresholds"].update(config.thresholds)
+    if config.cooldown_minutes is not None:
+        _alert_config["cooldown_minutes"] = config.cooldown_minutes
+
+    return {
+        "status": "success",
+        "config": {
+            "recipients": _alert_config["recipients"],
+            "enabled": _alert_config["enabled"],
+            "thresholds": _alert_config["thresholds"],
+            "cooldown_minutes": _alert_config["cooldown_minutes"],
+        }
+    }
+
+
+@app.get("/api/alerts/config")
+async def get_alert_config():
+    """Get current alert configuration."""
+    return {
+        "recipients": _alert_config["recipients"],
+        "enabled": _alert_config["enabled"],
+        "thresholds": _alert_config["thresholds"],
+        "cooldown_minutes": _alert_config["cooldown_minutes"],
+    }
+
+
+@app.post("/api/alerts/test")
+async def test_whatsapp_alert(phone: str = None):
+    """Send a test WhatsApp alert to verify Twilio integration works."""
+    recipient = phone or (_alert_config["recipients"][0] if _alert_config["recipients"] and _alert_config["recipients"][0] else None)
+    if not recipient:
+        return {"status": "error", "message": "No recipient phone number provided. Pass ?phone=+91XXXXXXXXXX or configure recipients."}
+
+    test_msg = (
+        "🧪 *SkyView AI - Test Alert*\n\n"
+        "This is a test message from your SkyView AI agricultural monitoring system.\n"
+        "If you see this, WhatsApp alerts are working correctly! ✅\n\n"
+        f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    )
+    sid = send_whatsapp_message(recipient, test_msg)
+    if sid:
+        return {"status": "success", "message": f"Test alert sent to {recipient}", "message_sid": sid}
+    return {"status": "error", "message": f"Failed to send test alert to {recipient}. Check Twilio credentials and sandbox."}
+
+
+def _check_sensor_alerts():
+    """
+    Background task: check latest sensor data against thresholds.
+    Sends WhatsApp alerts when thresholds are exceeded, respecting cooldown.
+    """
+    if not _alert_config["enabled"]:
+        return
+
+    recipients = [r for r in _alert_config["recipients"] if r and r.strip()]
+    if not recipients:
+        return
+
+    try:
+        from tools import get_latest_weather
+        sensor = get_latest_weather("WS01")
+        if not sensor:
+            return
+
+        thresholds = _alert_config["thresholds"]
+        cooldown = _alert_config["cooldown_minutes"]
+        now = datetime.now()
+        alerts_to_send = []
+
+        # Temperature checks
+        temp = sensor.get("temperature")
+        if temp is not None:
+            if temp >= thresholds.get("temperature_high", 40):
+                alerts_to_send.append(("temp_high", f"🌡️ *HIGH TEMPERATURE ALERT*\nCurrent: {temp}°C (Threshold: {thresholds['temperature_high']}°C)\n⚠️ Increase irrigation. Provide shade to sensitive crops."))
+            elif temp <= thresholds.get("temperature_low", 5):
+                alerts_to_send.append(("temp_low", f"❄️ *LOW TEMPERATURE ALERT*\nCurrent: {temp}°C (Threshold: {thresholds['temperature_low']}°C)\n⚠️ Frost risk! Protect crops with covers."))
+
+        # Humidity checks
+        humidity = sensor.get("humidity")
+        if humidity is not None:
+            if humidity >= thresholds.get("humidity_high", 90):
+                alerts_to_send.append(("humid_high", f"💧 *HIGH HUMIDITY ALERT*\nCurrent: {humidity}% (Threshold: {thresholds['humidity_high']}%)\n⚠️ Fungal disease risk. Ensure ventilation."))
+            elif humidity <= thresholds.get("humidity_low", 20):
+                alerts_to_send.append(("humid_low", f"🏜️ *LOW HUMIDITY ALERT*\nCurrent: {humidity}% (Threshold: {thresholds['humidity_low']}%)\n⚠️ Increase watering frequency."))
+
+        # Soil moisture
+        soil_m = sensor.get("soil_moisture")
+        if soil_m is not None and soil_m > 0:
+            if soil_m <= thresholds.get("soil_moisture_low", 20):
+                alerts_to_send.append(("soil_dry", f"🌱 *DRY SOIL ALERT*\nSoil Moisture: {soil_m}% (Threshold: {thresholds['soil_moisture_low']}%)\n🚨 Urgent irrigation needed!"))
+            elif soil_m >= thresholds.get("soil_moisture_high", 85):
+                alerts_to_send.append(("soil_wet", f"🌊 *WATERLOGGED SOIL ALERT*\nSoil Moisture: {soil_m}% (Threshold: {thresholds['soil_moisture_high']}%)\n⚠️ Root rot risk. Improve drainage."))
+
+        # Rainfall
+        rain = sensor.get("rainfall")
+        if rain is not None and rain >= thresholds.get("rainfall_high", 15):
+            alerts_to_send.append(("rain_heavy", f"🌧️ *HEAVY RAINFALL ALERT*\nRainfall: {rain}mm (Threshold: {thresholds['rainfall_high']}mm)\n⚠️ Waterlogging risk. Check drainage."))
+
+        # Air quality
+        pm25 = sensor.get("air_quality_pm25")
+        if pm25 is not None and pm25 >= thresholds.get("pm25_high", 150):
+            alerts_to_send.append(("pm25_high", f"😷 *AIR QUALITY ALERT*\nPM2.5: {pm25} µg/m³ (Threshold: {thresholds['pm25_high']})\n⚠️ Avoid outdoor spraying."))
+
+        # Wind speed
+        wind = sensor.get("wind_speed")
+        if wind is not None and wind >= thresholds.get("wind_speed_high", 20):
+            alerts_to_send.append(("wind_high", f"💨 *HIGH WIND ALERT*\nWind Speed: {wind} m/s (Threshold: {thresholds['wind_speed_high']})\n⚠️ Secure tall plants and structures."))
+
+        # Send alerts respecting cooldown
+        for alert_key, alert_msg in alerts_to_send:
+            last_sent = _alert_config["last_alert_times"].get(alert_key)
+            if last_sent and (now - last_sent).total_seconds() < cooldown * 60:
+                continue  # Still in cooldown
+
+            full_msg = f"🚜 *SkyView AI Farm Alert*\n{'='*25}\n\n{alert_msg}\n\n📍 Station: WS01\n⏰ {now.strftime('%Y-%m-%d %H:%M:%S')}"
+
+            for recipient in recipients:
+                send_whatsapp_message(recipient.strip(), full_msg)
+
+            _alert_config["last_alert_times"][alert_key] = now
+            logger.info(f"📱 WhatsApp alert sent: {alert_key} to {len(recipients)} recipients")
+
+    except Exception as e:
+        logger.error(f"Error in alert monitor: {e}")
+
+
+# Background scheduler for alert monitoring
+_alert_scheduler = None
+
+@app.on_event("startup")
+def start_alert_monitor():
+    """Start background alert monitor on server startup."""
+    global _alert_scheduler
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        _alert_scheduler = BackgroundScheduler()
+        _alert_scheduler.add_job(
+            _check_sensor_alerts,
+            "interval",
+            seconds=_alert_config["check_interval_seconds"],
+            id="sensor_alert_monitor",
+            replace_existing=True
+        )
+        _alert_scheduler.start()
+        logger.info(f"📱 WhatsApp Alert Monitor started (every {_alert_config['check_interval_seconds']}s)")
+    except Exception as e:
+        logger.warning(f"Could not start alert scheduler: {e}")
+
+
 if __name__ == "__main__":
     try:
         print("About to import uvicorn...")
