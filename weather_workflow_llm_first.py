@@ -82,11 +82,16 @@ def predict_rain_data() -> str:
     try:
         # Try to load the rain model
         try:
-            model = joblib.load('rain_model.pkl')
+            model_path = os.path.join(os.path.dirname(__file__), 'models_cache', 'rain_model.pkl')
+            model = joblib.load(model_path)
         except:
-            # Fallback if model not available
-            print("Warning: rain_model.pkl not found, using simulation")
-            return json.dumps({"status": "success", "probability": 25.0, "note": "simulated"})
+            # Try root fallback
+            try:
+                model = joblib.load('rain_model.pkl')
+            except:
+                # Fallback if model not available
+                print("Warning: rain_model.pkl not found in root or models_cache, using simulation")
+                return json.dumps({"status": "success", "probability": 25.0, "note": "simulated"})
         
         sensor_id = "WS01"
         latest_data = get_latest_weather(sensor_id)
