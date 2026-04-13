@@ -132,7 +132,7 @@ class UnifiedZC706Bridge:
         }
         self.last_update_time = time.time()
         self.last_backend_send_time = 0
-        self.min_send_interval = 2  # seconds - minimum between backend sends (reduced for testing)
+        self.min_send_interval = 120  # seconds - minimum between backend sends (2 minutes for trends)
         
         # MQTT client
         self.client = mqtt.Client(callback_api_version=CallbackAPIVersion.VERSION1)

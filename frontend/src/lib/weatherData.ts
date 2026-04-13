@@ -181,7 +181,7 @@ export async function getRecentAlerts(): Promise<Alert[]> {
 export async function getHistoricalData(hours: number = 24): Promise<{ time: string; temperature: number; humidity: number; rainfall: number }[]> {
   try {
     // Build the URL to fetch historical data from the backend
-    const limit = Math.ceil(hours / 0.25); // ~96 records for 24 hours
+    const limit = Math.ceil(hours * 30); // ~720 records for 24 hours (every 2 minutes)
     const url = `${API_BASE}/history/${STATION_ID}?limit=${limit}`;
     console.log(' Fetching historical data from:', url);
     
