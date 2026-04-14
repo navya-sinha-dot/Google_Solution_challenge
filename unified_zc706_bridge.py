@@ -45,7 +45,7 @@ def _get_db_session():
 
 class UnifiedZC706Bridge:
     def __init__(self, 
-                 mqtt_broker="localhost",
+                 mqtt_broker=None,
                  mqtt_port=1883,
                  backend_url="http://localhost:8000/api/sensors/ingest",
                  station_id="WS01",
@@ -68,7 +68,7 @@ class UnifiedZC706Bridge:
             fpga_enabled: Enable FPGA acceleration
             fpga_port: Serial port for FPGA (e.g., COM4, /dev/ttyUSB0)
         """
-        self.mqtt_broker = mqtt_broker
+        self.mqtt_broker = mqtt_broker or os.getenv("MQTT_BROKER", "10.10.124.239")
         self.mqtt_port = mqtt_port
         self.backend_url = backend_url
         self.station_id = station_id
@@ -693,26 +693,14 @@ class UnifiedZC706Bridge:
 def main():
     """Run the unified bridge"""
     # Configuration
-    mqtt_broker = "192.168.0.129"
+    mqtt_broker = os.getenv("MQTT_BROKER", "10.10.124.239")
     mqtt_port = 1883
     backend_url = "http://localhost:8000/api/sensors/ingest"
     station_id = "WS01"
     fpga_enabled = True
     fpga_port = "COM4"
     
-    # Parse command line arguments
-    if len(sys.argv) > 1:
-        mqtt_broker = sys.argv[1]
-    if len(sys.argv) > 2:
-        mqtt_port = int(sys.argv[2])
-    if len(sys.argv) > 3:
-        backend_url = sys.argv[3]
-    if len(sys.argv) > 4:
-        station_id = sys.argv[4]
-    if len(sys.argv) > 5:
-        fpga_enabled = sys.argv[5].lower() == "true"
-    if len(sys.argv) > 6:
-        fpga_port = sys.argv[6]
+    mqtt_port = int(os.getenv("MQTT_PORT", "1883"))
     
     # Create and start bridge
     bridge = UnifiedZC706Bridge(

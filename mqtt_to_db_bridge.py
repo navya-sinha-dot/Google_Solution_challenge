@@ -34,6 +34,7 @@ from paho.mqtt.enums import CallbackAPIVersion
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 import threading
+from datetime import timezone
 
 # ── Configuration ──
 STATION_ID = "WS01"
@@ -78,6 +79,7 @@ class MQTTSensorBridge:
     def __init__(self, broker, port=1883):
         self.broker = broker
         self.port = port
+        self.station_id = os.getenv("STATION_ID", STATION_ID)
         self.lock = threading.Lock()
         self.msg_count = 0
         self.db_writes = 0
@@ -110,6 +112,29 @@ class MQTTSensorBridge:
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
         self.client.on_disconnect = self.on_disconnect
+
+    def _safe_timestamp(self, value):
+        """Return a sane datetime from incoming epoch (s/ms), else server time."""
+        now = datetime.now()
+        min_valid = datetime(2020, 1, 1)
+        max_valid = datetime(now.year + 1, 1, 1)
+
+        try:
+            if value is None:
+                return now
+
+            epoch = int(float(value))
+
+            # Handle milliseconds epoch
+            if epoch > 10_000_000_000:
+                epoch = epoch // 1000
+
+            dt = datetime.fromtimestamp(epoch)
+            if dt < min_valid or dt > max_valid:
+                return now
+            return dt
+        except Exception:
+            return now
 
     def on_connect(self, client, userdata, flags, rc, properties=None):
         if rc == 0:
@@ -155,8 +180,8 @@ class MQTTSensorBridge:
         """Handle a complete sensor reading from farm/sensors/complete topic"""
         try:
             reading = {
-                "station_id": data.get("id", STATION_ID),
-                "timestamp": datetime.fromtimestamp(data.get("ts", time.time())),
+                "station_id": self.station_id,
+                "timestamp": self._safe_timestamp(data.get("ts")),
                 "temperature": data.get("env", {}).get("t"),
                 "humidity": data.get("env", {}).get("h"),
                 "pressure": data.get("env", {}).get("p"),
@@ -188,7 +213,7 @@ class MQTTSensorBridge:
                 return
             
             reading = {
-                "station_id": STATION_ID,
+                "station_id": self.station_id,
                 "timestamp": datetime.now(),
                 "temperature": self.sensor_data["temperature"],
                 "humidity": self.sensor_data["humidity"],
@@ -266,7 +291,7 @@ class MQTTSensorBridge:
         logger.info("  MQTT -> PostgreSQL Bridge")
         logger.info("=" * 60)
         logger.info(f"  Broker:  {self.broker}:{self.port}")
-        logger.info(f"  Station: {STATION_ID}")
+        logger.info(f"  Station: {self.station_id}")
         logger.info(f"  Topics:  {len(MQTT_TOPICS)} sensor topics")
         logger.info("=" * 60)
         
@@ -285,8 +310,8 @@ class MQTTSensorBridge:
 
 
 def main():
-    broker = sys.argv[1] if len(sys.argv) > 1 else "10.145.110.61"
-    port = int(sys.argv[2]) if len(sys.argv) > 2 else 1883
+    broker = os.getenv("MQTT_BROKER", "10.10.124.239")
+    port = int(os.getenv("MQTT_PORT", "1883"))
     
     bridge = MQTTSensorBridge(broker=broker, port=port)
     bridge.start()

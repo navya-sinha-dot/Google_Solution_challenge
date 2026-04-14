@@ -13,10 +13,13 @@ echo "========================================="
 echo "Starting AMD Hackathon Project"
 echo "========================================="
 
-echo "[1/2] Starting Python backend..."
+echo "[1/3] Starting MQTT -> DB bridge..."
+python mqtt_to_db_bridge.py &
+
+echo "[2/3] Starting Python backend..."
 python app.py &
 
-echo "[2/2] Starting Vite React frontend..."
+echo "[3/3] Starting Vite React frontend..."
 cd frontend || exit
 npm run dev &
 

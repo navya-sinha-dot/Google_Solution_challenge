@@ -22,6 +22,24 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/sensors", tags=["Sensor Data"])
 
 
+def safe_reading_datetime(ts_value: Any) -> datetime:
+    """Convert incoming epoch (s/ms) to sane datetime; fallback to server time."""
+    now = datetime.now()
+    min_valid = datetime(2020, 1, 1)
+    max_valid = datetime(now.year + 1, 1, 1)
+
+    try:
+        epoch = int(float(ts_value))
+        if epoch > 10_000_000_000:
+            epoch = epoch // 1000
+        dt = datetime.fromtimestamp(epoch)
+        if dt < min_valid or dt > max_valid:
+            return now
+        return dt
+    except Exception:
+        return now
+
+
 def snake_to_camel(snake_str: str) -> str:
     """Convert snake_case to camelCase"""
     components = snake_str.split('_')
@@ -76,9 +94,8 @@ def store_sensor_data(db, sensor_reading: SensorReading) -> bool:
         True if successful, False otherwise
     """
     try:
-        # Convert Unix timestamp to datetime
-        from datetime import datetime as dt
-        reading_datetime = dt.fromtimestamp(sensor_reading.ts)
+        # Convert Unix timestamp to datetime (sanity-checked)
+        reading_datetime = safe_reading_datetime(sensor_reading.ts)
         
         query = text("""
             INSERT INTO weather_data (
