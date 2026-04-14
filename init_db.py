@@ -18,20 +18,10 @@ def init_db():
     try:
         engine = create_engine(db_url)
         
-        # 2. Define schema dynamically
+        # 2. Define schema — safe CREATE IF NOT EXISTS (never drops existing data)
         schema = """
-        -- Clear out existing tables to ensure a completely clean slate
-        DROP TABLE IF EXISTS users CASCADE;
-        DROP TABLE IF EXISTS weather_data CASCADE;
-        DROP TABLE IF EXISTS installations CASCADE;
-        DROP TABLE IF EXISTS installation_sensors CASCADE;
-        DROP TABLE IF EXISTS alerts CASCADE;
-        DROP TABLE IF EXISTS user_preferences CASCADE;
-        DROP TABLE IF EXISTS trends CASCADE;
-        DROP TABLE IF EXISTS system_health CASCADE;
-
         -- Create Users Table (used for authentication & profile)
-        CREATE TABLE users (
+        CREATE TABLE IF NOT EXISTS users (
             phone VARCHAR(20) PRIMARY KEY,
             name VARCHAR(100),
             land_size_acres FLOAT,
@@ -41,7 +31,7 @@ def init_db():
         );
 
         -- Create Weather Data Table
-        CREATE TABLE weather_data (
+        CREATE TABLE IF NOT EXISTS weather_data (
             id SERIAL PRIMARY KEY,
             station_id VARCHAR(50) NOT NULL,
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -64,7 +54,7 @@ def init_db():
         );
 
         -- Installations Table
-        CREATE TABLE installations (
+        CREATE TABLE IF NOT EXISTS installations (
             id SERIAL PRIMARY KEY,
             station_id VARCHAR(50) UNIQUE NOT NULL,
             name VARCHAR(100) NOT NULL,
@@ -82,7 +72,7 @@ def init_db():
         );
 
         -- Installation Sensors Table
-        CREATE TABLE installation_sensors (
+        CREATE TABLE IF NOT EXISTS installation_sensors (
             id SERIAL PRIMARY KEY,
             installation_id INTEGER REFERENCES installations(id) ON DELETE CASCADE,
             sensor_type VARCHAR(50) NOT NULL,
@@ -92,7 +82,7 @@ def init_db():
         );
 
         -- Alerts Table
-        CREATE TABLE alerts (
+        CREATE TABLE IF NOT EXISTS alerts (
             id SERIAL PRIMARY KEY,
             user_id VARCHAR(50),
             station_id VARCHAR(50) NOT NULL,
@@ -107,7 +97,7 @@ def init_db():
         );
 
         -- User Preferences
-        CREATE TABLE user_preferences (
+        CREATE TABLE IF NOT EXISTS user_preferences (
             id SERIAL PRIMARY KEY,
             user_id VARCHAR(50) UNIQUE NOT NULL,
             preferred_unit VARCHAR(10) DEFAULT 'C',
@@ -117,7 +107,7 @@ def init_db():
         );
 
         -- Historical Trends Cache
-        CREATE TABLE trends (
+        CREATE TABLE IF NOT EXISTS trends (
             id SERIAL PRIMARY KEY,
             station_id VARCHAR(50) NOT NULL,
             metric VARCHAR(50) NOT NULL,
@@ -130,7 +120,7 @@ def init_db():
         );
         
         -- System Health Table
-        CREATE TABLE system_health (
+        CREATE TABLE IF NOT EXISTS system_health (
             id SERIAL PRIMARY KEY,
             station_id VARCHAR(50) NOT NULL,
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -143,12 +133,12 @@ def init_db():
         """
 
         # 3. Execute SQL
-        print("Applying PostgreSQL Schema...")
+        print("Applying PostgreSQL Schema (safe — no data will be dropped)...")
         with engine.begin() as conn:
             conn.execute(text(schema))
             
-        print("SUCCESS: Full database schema strictly initialized.")
-        print("Replaced older conflicting tables and successfully mapped all resources.")
+        print("SUCCESS: All tables verified/created. Existing data preserved.")
+        print("Tables: users, weather_data, installations, installation_sensors, alerts, user_preferences, trends, system_health")
         
     except Exception as e:
         print(f"ERROR: {e}")

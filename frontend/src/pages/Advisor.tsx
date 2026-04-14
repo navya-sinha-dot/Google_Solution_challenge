@@ -16,7 +16,7 @@ export default function Advisor() {
   const [lastUpdateSec, setLastUpdateSec] = useState(0);
 
   // AI insights
-  const [overview, setOverview] = useState<{ summary: string; focus_points: string[] } | null>(null);
+  const [overview, setOverview] = useState<{ summary: string; focus_points: string[]; details?: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   // Fetch live sensor data on mount + interval
@@ -157,10 +157,14 @@ export default function Advisor() {
                 {overview && typeof overview === "object" ? (
                   <>
                     <div style={{ marginBottom: 32 }}>
-                      <p style={{ fontSize: 18, lineHeight: 1.8, color: isDark ? "#C8E8C8" : "#333", fontWeight: 500 }}>
-                        {overview.summary}
-                      </p>
+                      <p style={{ fontSize: 18, lineHeight: 1.8, color: isDark ? "#C8E8C8" : "#333", fontWeight: 500 }} dangerouslySetInnerHTML={{ __html: overview.summary }} />
                     </div>
+
+                    {overview.details && (
+                      <div style={{ marginBottom: 24 }}>
+                        <p style={{ fontSize: 15, lineHeight: 1.8, color: isDark ? "#E5E7EB" : "#444", fontWeight: 400 }} dangerouslySetInnerHTML={{ __html: overview.details }} />
+                      </div>
+                    )}
 
                     {overview.focus_points && Array.isArray(overview.focus_points) && (
                       <div>

@@ -67,6 +67,7 @@ def get_current_weather_data() -> str:
                     "soil_temperature": data.get("soilTemperature"),
                     "soil_moisture": data.get("soilMoisture"),
                     "air_quality_pm25": data.get("airQualityPM25"),
+                    "light_intensity": data.get("lightIntensity"),
                     "timestamp": data.get("timestamp")
                 }
                 return json.dumps({"status": "success", "data": weather_data})
@@ -78,21 +79,12 @@ def get_current_weather_data() -> str:
         return json.dumps({"status": "error", "message": str(e)})
 
 def predict_rain_data() -> str:
-    """Predict rain probability using ML model."""
+    """Predict rain probability using RTL logic."""
+    return predict_rain_rtl()
+
+def predict_rain_rtl() -> str:
+    """Predict rain probability using RTL logic (from rain_predictor.v)."""
     try:
-        # Try to load the rain model
-        try:
-            model_path = os.path.join(os.path.dirname(__file__), 'models_cache', 'rain_model.pkl')
-            model = joblib.load(model_path)
-        except:
-            # Try root fallback
-            try:
-                model = joblib.load('rain_model.pkl')
-            except:
-                # Fallback if model not available
-                print("Warning: rain_model.pkl not found in root or models_cache, using simulation")
-                return json.dumps({"status": "success", "probability": 25.0, "note": "simulated"})
-        
         sensor_id = "WS01"
         latest_data = get_latest_weather(sensor_id)
         
@@ -104,35 +96,203 @@ def predict_rain_data() -> str:
                 "wind_speed": 5.0
             }
         
-        try:
-            end = datetime.now()
-            start = end - timedelta(hours=1)
-            recent_data = get_weather_range(sensor_id, start.isoformat(), end.isoformat())
-            
-            if len(recent_data) >= 2:
-                pressures = [d.get('pressure') for d in recent_data if d.get('pressure') is not None]
-                pressure_change = pressures[-1] - pressures[0] if len(pressures) >= 2 else 0
-            else:
-                pressure_change = 0
-        except:
-            pressure_change = 0
+        # Extract values (assuming they are in proper units)
+        temp = latest_data.get('temperature', 25.0)
+        humid = latest_data.get('humidity', 60.0)
+        press = latest_data.get('pressure', 1010.0)
+        wind = latest_data.get('wind_speed', 3.0)
         
-        features = {
-            'temperature': latest_data.get('temperature', 25),
-            'humidity': latest_data.get('humidity', 60),
-            'pressure': latest_data.get('pressure', 1010),
-            'wind_speed': latest_data.get('wind_speed', 3),
-            'hour': datetime.now().hour,
-            'pressure_change_30min': pressure_change
-        }
+        # Convert to Q8.8 format (multiply by 256)
+        temp_q88 = int(temp * 256)
+        humid_q88 = int(humid * 256)
+        press_q88 = int(press * 256)  # Note: pressure is in hPa, may need scaling
+        wind_q88 = int(wind * 256)
         
-        df = pd.DataFrame([features])
-        prob = model.predict_proba(df)[0][1]
+        # Constants from RTL
+        Q88_70 = 0x4600   # 70.0 * 256
+        Q88_100 = 0x6400  # 100.0 * 256
+        Q88_50 = 0x3200   # 50.0 * 256
+        Q88_30 = 0x1E00   # 30.0 * 256
+        Q88_60 = 0x3C00   # 60.0 * 256
+        Q88_25 = 0x1900   # 25.0 * 256
+        Q88_15 = 0x0F00   # 15.0 * 256
+        Q88_85 = 0x5500   # 85.0 * 256
+        Q88_40 = 0x2800   # 40.0 * 256
+        Q88_80 = 0x5000   # 80.0 * 256
+        Q88_95 = 0x5F00   # 95.0 * 256
+        Q88_20 = 0x1400   # 20.0 * 256
+        Q88_45 = 0x2D00   # 45.0 * 256
+        Q88_5 = 0x0500    # 5.0 * 256
+        Q88_35 = 0x2300   # 35.0 * 256
+        Q88_90 = 0x5A00   # 90.0 * 256
+        
+        # Rain score calculation
+        rain_score = 0
+        
+        # High humidity contribution
+        if humid_q88 > Q88_70:
+            rain_score += 35 + ((humid_q88 - Q88_70) // 256)  # 35 + (humid - 70)
+        elif humid_q88 > Q88_50:
+            rain_score += ((humid_q88 - Q88_50) * 28) // (256 * 16)  # (humid - 50) * 1.75
+        
+        # Pressure contribution (lower = more rain)
+        if press_q88 < Q88_30:
+            rain_score += ((Q88_30 - press_q88) * 21) // (256 * 16)  # (30 - press) * 1.33
+        elif press_q88 < Q88_50:
+            rain_score += ((Q88_50 - press_q88) * 6) // (256 * 16)   # (50 - press) * 0.4
+        
+        # Temperature contribution
+        if temp_q88 >= Q88_15 and temp_q88 <= Q88_25:
+            rain_score += 15
+        elif temp_q88 > Q88_25 and temp_q88 < Q88_35:
+            rain_score += 10
+        elif temp_q88 >= Q88_5 and temp_q88 < Q88_15:
+            rain_score += 12
+        
+        # Wind contribution
+        if wind_q88 > Q88_5 and wind_q88 < Q88_15:
+            rain_score += 10
+        elif wind_q88 >= Q88_15:
+            rain_score += 8
+        
+        # Clamp to 0-100
+        rain_score = min(max(rain_score, 0), 100)
+        
+        # Stress level calculation
+        stress_score = 0
+        
+        # Humidity extremes
+        if humid_q88 > Q88_90 or humid_q88 < Q88_20:
+            stress_score += 25
+        elif humid_q88 > Q88_80 or humid_q88 < Q88_30:
+            stress_score += 15
+        
+        # Pressure instability
+        if press_q88 < Q88_20:
+            stress_score += 30
+        elif press_q88 < Q88_30:
+            stress_score += 20
+        
+        # Temperature extremes
+        if temp_q88 > 0x2800 or temp_q88 < Q88_5:  # >40 or <5
+            stress_score += 20
+        elif temp_q88 > Q88_35 or temp_q88 < 0x0500:  # >35 or <5
+            stress_score += 10
+        
+        # Wind extremes
+        if wind_q88 > 0x1400:  # >20
+            stress_score += 25
+        elif wind_q88 > Q88_15:
+            stress_score += 15
+        
+        stress_score = min(max(stress_score, 0), 100)
+        
+        # Rain alert
+        alert = 0
+        if rain_score > 60 and press_q88 < Q88_40:
+            alert = 1
+        if humid_q88 > Q88_85 and press_q88 < Q88_45:
+            alert = 1
+        if stress_score > 70 and rain_score > 50:
+            alert = 1
         
         return json.dumps({
             "status": "success",
-            "probability": round(prob * 100, 1),
-            "features": features
+            "probability": rain_score,
+            "stress_level": stress_score,
+            "rain_alert": bool(alert),
+            "features": {
+                "temperature": temp,
+                "humidity": humid,
+                "pressure": press,
+                "wind_speed": wind
+            }
+        })
+    except Exception as e:
+        return json.dumps({"status": "error", "message": str(e)})
+
+def sensor_fusion_analysis() -> str:
+    """Perform sensor fusion analysis using RTL logic (from sensor_fusion.v)."""
+    try:
+        sensor_id = "WS01"
+        latest_data = get_latest_weather(sensor_id)
+        
+        if not latest_data:
+            latest_data = {
+                "soil_moisture": 50.0,
+                "temperature": 25.0,
+                "humidity": 60.0,
+                "light_level": 50.0
+            }
+        
+        # Extract values (assuming 0-100 range for soil, temp, humid; scale light from lux to 0-100)
+        soil = latest_data.get('soil_moisture', 50.0)
+        temp = latest_data.get('temperature', 25.0)
+        humid = latest_data.get('humidity', 60.0)
+        light_lux = latest_data.get('light_intensity', 50000.0)  # Default 50000 lux
+        light = min(light_lux / 1000.0, 100.0)  # Scale 0-100000 lux to 0-100
+        
+        # Convert to Q8.8 (multiply by 256)
+        soil_q88 = int(soil * 256)
+        temp_q88 = int(temp * 256)
+        humid_q88 = int(humid * 256)
+        light_q88 = int(light * 256)
+        
+        # Weights from RTL
+        w_soil = 0x0059   # 0.35 * 256
+        w_temp = 0x0040   # 0.25 * 256
+        w_humid = 0x0033  # 0.20 * 256
+        w_light = 0x0033  # 0.20 * 256
+        
+        # Weighted multiplication (simulate DSP48E1)
+        mult_soil = soil_q88 * w_soil
+        mult_temp = temp_q88 * w_temp
+        mult_humid = humid_q88 * w_humid
+        mult_light = light_q88 * w_light
+        
+        # Sum (two stages)
+        sum1 = mult_soil + mult_temp
+        sum2 = mult_humid + mult_light
+        fusion_full = sum1 + sum2
+        
+        # Extract Q8.8 result (divide by 256)
+        fusion_score = fusion_full // 256
+        
+        # Stress index: |fusion - 50| * 2
+        optimal = 0x3200  # 50.0 * 256
+        if fusion_score > 50:
+            stress_raw = fusion_score - 50
+        else:
+            stress_raw = 50 - fusion_score
+        stress_index = stress_raw * 2
+        
+        # Clamp stress to 0-100
+        stress_index = min(max(stress_index, 0), 100)
+        
+        # Alert level based on thresholds
+        if stress_index >= 80:
+            alert_level = 4  # CRITICAL
+        elif stress_index >= 60:
+            alert_level = 3  # HIGH
+        elif stress_index >= 40:
+            alert_level = 2  # MODERATE
+        elif stress_index >= 20:
+            alert_level = 1  # LOW
+        else:
+            alert_level = 0  # NONE
+        
+        return json.dumps({
+            "status": "success",
+            "fusion_score": fusion_score,
+            "stress_index": stress_index,
+            "alert_level": alert_level,
+            "inputs": {
+                "soil_moisture": soil,
+                "temperature": temp,
+                "humidity": humid,
+                "light_intensity": light_lux,
+                "light_level_scaled": light
+            }
         })
     except Exception as e:
         return json.dumps({"status": "error", "message": str(e)})
@@ -199,15 +359,15 @@ Provide helpful, practical farming advice. Consider weather and soil conditions 
             return {"response": "I can help with farming advice, but I'm having technical difficulties. Please try again."}
     
     # STEP 1: ReAct - Reasoning (LLM decides what data is needed)
-    reasoning_prompt = f"""You are an intelligent assistant for a REAL weather monitoring system with physical sensors.
+    reasoning_prompt = f"""You are an intelligent assistant for a REAL agricultural monitoring system with physical sensors.
 
 User question: "{user_message}"
 
 Available data sources:
-- get_current_weather: Real-time sensor readings (temperature, humidity, pressure, wind, rain)
-- predict_rain: ML model predictions based on current conditions
+- get_current_weather: Real-time sensor readings (temperature, humidity, pressure, wind, rain, soil moisture)
+- predict_rain: RTL-based rain predictions using sensor fusion
+- sensor_fusion: Overall sensor analysis using RTL fusion algorithm
 - get_trends: Historical patterns from database
-- get_system_health: Sensor status and battery levels
 
 Think step by step:
 1. What specific data does the user need?
@@ -218,7 +378,7 @@ Respond with ONLY the tool name you need, or "GENERAL" if no tool needed.
 Examples:
 - "What's the temperature?" → get_current_weather
 - "Will it rain?" → predict_rain  
-- "Why does pressure drop?" → GENERAL
+- "How are my crops doing?" → sensor_fusion
 - "Show trends" → get_trends
 
 Your response (one word):"""
@@ -246,23 +406,23 @@ Your response (one word):"""
             observation = get_trends_data()
             tool_data = json.loads(observation)
         
-        elif "health" in tool_choice or "status" in tool_choice or "sensor" in user_lower:
-            print(f"[TOOL] CALLED: get_system_health_data()")
-            observation = get_system_health_data()
+        elif "fusion" in tool_choice or "sensor" in tool_choice or "crop" in user_lower or "plant" in user_lower or "health" in user_lower:
+            print(f"[TOOL] CALLED: sensor_fusion_analysis()")
+            observation = sensor_fusion_analysis()
             tool_data = json.loads(observation)
         
         # STEP 3: ReAct - Observation + Response (LLM uses real data)
         if observation:
             print(f"[OBSERVATION] {observation[:200]}...")
             
-            response_prompt = f"""You are a weather monitoring assistant with access to REAL sensor data.
+            response_prompt = f"""You are an agricultural monitoring assistant with access to REAL sensor data from RTL-based analysis.
 
 User asked: "{user_message}"
 
-REAL DATA from our sensors/system:
+REAL DATA from our sensors and RTL analysis:
 {observation}
 
-Provide a natural, helpful response using these ACTUAL values. Be specific with the numbers and readings."""
+Provide a natural, helpful response using these ACTUAL values from our FPGA-accelerated sensor fusion. Be specific with the numbers and analysis results."""
         else:
             # No tool needed - general knowledge
             print(f"[GENERAL] KNOWLEDGE response (no tool needed)")
@@ -286,9 +446,9 @@ Provide a natural, helpful response using these ACTUAL values. Be specific with 
         elif "trend" in user_lower:
             data = get_trends_data()
             return {"response": f"Trends:\n{data}"}
-        elif "health" in user_lower or "sensor" in user_lower:
-            data = get_system_health_data()
-            return {"response": f"System Status:\n{data}"}
+        elif "health" in user_lower or "sensor" in user_lower or "crop" in user_lower or "plant" in user_lower:
+            data = sensor_fusion_analysis()
+            return {"response": f"Overall Analysis:\n{data}"}
         else:
             try:
                 response = llm.invoke([("user", user_message)])

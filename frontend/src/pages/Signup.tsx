@@ -57,6 +57,27 @@ export default function Signup() {
             setError('Please provide your name and phone number minimum.');
             return;
         }
+
+        const trimmedName = name.trim();
+        if (trimmedName.toLowerCase() === 'xyz' || trimmedName.length < 2 || !/^[A-Za-z\s]+$/.test(trimmedName)) {
+            setError('Please provide a valid name.');
+            return;
+        }
+
+        const phoneStr = phone.trim().replace(/[- \(\)]/g, '').replace(/^\+?91/, '');
+        if (!/^\d{10}$/.test(phoneStr)) {
+            setError('Mobile number should be 10 digits only.');
+            return;
+        }
+
+        if (landSize) {
+            const landStr = landSize.trim().toLowerCase();
+            if (landStr.includes('cm') || isNaN(Number(landStr))) {
+                setError('Please provide a valid land size in acres (numbers only, no cm).');
+                return;
+            }
+        }
+
         setError('');
         setIsLoading(true);
 

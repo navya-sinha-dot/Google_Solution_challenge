@@ -257,8 +257,8 @@ const translations: Translations = {
   // AI Accelerator (aliased keys)
   accel_sending: { en: 'Processing...' },
   accel_predict_rain: { en: 'Predict Rain' },
-  accel_health_check: { en: 'Run Health Check' },
-  accel_run_analysis: { en: 'Run Analysis' },
+  accel_sensor_fusion: { en: 'Run Sensor Fusion' },
+  accel_run_analysis: { en: 'Run Overall Analysis' },
   accel_hardware: { en: 'Hardware' },
 };
 

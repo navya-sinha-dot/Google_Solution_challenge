@@ -74,10 +74,13 @@ export default function AIHardwareAccelerator() {
     ];
 
     interface Particle {
-      x: number; y: number;
-      vx: number; vy: number;
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
       radius: number;
-      name: string; emoji: string;
+      name: string;
+      emoji: string;
       glowPhase: number;
       trail: { x: number; y: number }[];
       isDragged?: boolean;
@@ -171,8 +174,10 @@ export default function AIHardwareAccelerator() {
 
     const draw = () => {
       tick++;
-      const W = w(), H = h();
-      const cx = W / 2, cy = H / 2;
+      const W = w(),
+        H = h();
+      const cx = W / 2,
+        cy = H / 2;
 
       ctx.clearRect(0, 0, W, H);
 
@@ -218,7 +223,10 @@ export default function AIHardwareAccelerator() {
 
           // Speed limit
           const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
-          if (speed > 1) { p.vx *= 1 / speed; p.vy *= 1 / speed; }
+          if (speed > 1) {
+            p.vx *= 1 / speed;
+            p.vy *= 1 / speed;
+          }
 
           p.x += p.vx;
           p.y += p.vy;
@@ -251,7 +259,14 @@ export default function AIHardwareAccelerator() {
         ctx.fill();
 
         // Particle circle
-        const pgrd = ctx.createRadialGradient(p.x - 6, p.y - 6, 2, p.x, p.y, p.radius);
+        const pgrd = ctx.createRadialGradient(
+          p.x - 6,
+          p.y - 6,
+          2,
+          p.x,
+          p.y,
+          p.radius
+        );
         pgrd.addColorStop(0, "rgba(39, 174, 96, 0.95)");
         pgrd.addColorStop(1, "rgba(13, 59, 27, 0.95)");
         ctx.beginPath();
@@ -344,13 +359,19 @@ export default function AIHardwareAccelerator() {
         });
       }
     } catch {
-      setHardwareStatus({ mode: "disconnected", port: null, fpga_enabled: false });
+      setHardwareStatus({
+        mode: "disconnected",
+        port: null,
+        fpga_enabled: false,
+      });
     }
   };
 
   const fetchSensorData = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/sensors/latest/WS01");
+      const response = await fetch(
+        "http://localhost:8000/api/sensors/latest/WS01"
+      );
       if (response.ok) {
         const data = await response.json();
         setConnectionStatus(true);
@@ -380,26 +401,43 @@ export default function AIHardwareAccelerator() {
   const predictRain = async () => {
     setLoadingRain(true);
     try {
-      const response = await fetch("http://localhost:8000/api/fpga/rain-predict", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          temperature: currentSensorData.temperature,
-          humidity: currentSensorData.humidity,
-          pressure: currentSensorData.pressure,
-          wind_speed: currentSensorData.wind_speed,
-        }),
-      });
+      const response = await fetch(
+        "http://localhost:8000/api/fpga/rain-predict",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            temperature: currentSensorData.temperature,
+            humidity: currentSensorData.humidity,
+            pressure: currentSensorData.pressure,
+            wind_speed: currentSensorData.wind_speed,
+          }),
+        }
+      );
       if (response.ok) {
         const data = await response.json();
         setRainPrediction(data);
-        if (data.hardware_mode) setHardwareStatus((p) => ({ ...p, mode: data.hardware_mode }));
-        toast({ title: " Rain Prediction Complete", description: `${data.prediction.rain_probability}% via ${data.hardware_mode === "real_hardware" ? "COM4" : "ML Model Cache"}` });
+        if (data.hardware_mode)
+          setHardwareStatus((p) => ({ ...p, mode: data.hardware_mode }));
+        toast({
+          title: " Rain Prediction Complete",
+          description: `${data.prediction.rain_probability}% via ${
+            data.hardware_mode === "real_hardware" ? "COM4" : "ML Model Cache"
+          }`,
+        });
       } else {
-        toast({ title: " Prediction Failed", description: "Could not reach FPGA", variant: "destructive" });
+        toast({
+          title: " Prediction Failed",
+          description: "Could not reach FPGA",
+          variant: "destructive",
+        });
       }
     } catch {
-      toast({ title: " Error", description: "Connection to backend failed", variant: "destructive" });
+      toast({
+        title: " Error",
+        description: "Connection to backend failed",
+        variant: "destructive",
+      });
     } finally {
       setLoadingRain(false);
     }
@@ -421,13 +459,25 @@ export default function AIHardwareAccelerator() {
       if (response.ok) {
         const data = await response.json();
         setSensorFusion(data);
-        if (data.hardware_mode) setHardwareStatus((p) => ({ ...p, mode: data.hardware_mode }));
-        toast({ title: "Crop Health Analysis Complete", description: `via ${data.hardware_mode === "real_hardware" ? "COM4 Hardware" : "ML Prediction Cache"}` });
+        if (data.hardware_mode)
+          setHardwareStatus((p) => ({ ...p, mode: data.hardware_mode }));
+        toast({
+          title: "Sensor Fusion Analysis Complete",
+          description: `via ${
+            data.hardware_mode === "real_hardware"
+              ? "COM4 Hardware"
+              : "ML Prediction Cache"
+          }`,
+        });
       } else {
         toast({ title: " Analysis Failed", variant: "destructive" });
       }
     } catch {
-      toast({ title: " Error", description: "Connection failed", variant: "destructive" });
+      toast({
+        title: " Error",
+        description: "Connection failed",
+        variant: "destructive",
+      });
     } finally {
       setLoadingFusion(false);
     }
@@ -436,26 +486,34 @@ export default function AIHardwareAccelerator() {
   const runCombinedAnalysis = async () => {
     setLoadingCombined(true);
     try {
-      const response = await fetch("http://localhost:8000/api/fpga/combined-analysis", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          soil_moisture: currentSensorData.soil_moisture,
-          temperature: currentSensorData.temperature,
-          humidity: currentSensorData.humidity,
-          light_level: currentSensorData.light_level,
-        }),
-      });
+      const response = await fetch(
+        "http://localhost:8000/api/fpga/combined-analysis",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            soil_moisture: currentSensorData.soil_moisture,
+            temperature: currentSensorData.temperature,
+            humidity: currentSensorData.humidity,
+            light_level: currentSensorData.light_level,
+          }),
+        }
+      );
       if (response.ok) {
         const data = await response.json();
         setCombinedAnalysis(data);
-        if (data.hardware_mode) setHardwareStatus((p) => ({ ...p, mode: data.hardware_mode }));
+        if (data.hardware_mode)
+          setHardwareStatus((p) => ({ ...p, mode: data.hardware_mode }));
         toast({ title: "Irrigation Analysis Complete" });
       } else {
         toast({ title: " Analysis Failed", variant: "destructive" });
       }
     } catch {
-      toast({ title: " Error", description: "Connection failed", variant: "destructive" });
+      toast({
+        title: " Error",
+        description: "Connection failed",
+        variant: "destructive",
+      });
     } finally {
       setLoadingCombined(false);
     }
@@ -469,19 +527,42 @@ export default function AIHardwareAccelerator() {
     return { bg: "#DCFCE7", text: "#16A34A" };
   };
 
-  const hwBadge = hardwareStatus.mode === "real_hardware"
-    ? { label: t('accel_connected'), color: "#2ECC71", bg: "rgba(46,204,113,0.15)", icon: <Wifi style={{ width: 14, height: 14 }} /> }
-    : hardwareStatus.mode === "simulation"
-      ? { label: t('accel_simulation'), color: "#F59E0B", bg: "rgba(245,158,11,0.15)", icon: <Cpu style={{ width: 14, height: 14 }} /> }
-      : { label: t('accel_disconnected'), color: "#EF4444", bg: "rgba(239,68,68,0.15)", icon: <WifiOff style={{ width: 14, height: 14 }} /> };
+  const hwBadge =
+    hardwareStatus.mode === "real_hardware"
+      ? {
+          label: t("accel_connected"),
+          color: "#2ECC71",
+          bg: "rgba(46,204,113,0.15)",
+          icon: <Wifi style={{ width: 14, height: 14 }} />,
+        }
+      : hardwareStatus.mode === "simulation"
+      ? {
+          label: t("accel_simulation"),
+          color: "#F59E0B",
+          bg: "rgba(245,158,11,0.15)",
+          icon: <Cpu style={{ width: 14, height: 14 }} />,
+        }
+      : {
+          label: t("accel_disconnected"),
+          color: "#EF4444",
+          bg: "rgba(239,68,68,0.15)",
+          icon: <WifiOff style={{ width: 14, height: 14 }} />,
+        };
 
   const modeBadge = (mode?: string) => (
-    <span style={{
-      fontSize: "0.7rem", padding: "0.2rem 0.6rem", borderRadius: 9999,
-      backgroundColor: mode === "real_hardware" ? "rgba(46,204,113,0.2)" : "rgba(245,158,11,0.2)",
-      color: mode === "real_hardware" ? "#2ECC71" : "#F59E0B",
-    }}>
-      {mode === "real_hardware" ? t('accel_hardware') : t('accel_simulation')}
+    <span
+      style={{
+        fontSize: "0.7rem",
+        padding: "0.2rem 0.6rem",
+        borderRadius: 9999,
+        backgroundColor:
+          mode === "real_hardware"
+            ? "rgba(46,204,113,0.2)"
+            : "rgba(245,158,11,0.2)",
+        color: mode === "real_hardware" ? "#2ECC71" : "#F59E0B",
+      }}
+    >
+      {mode === "real_hardware" ? t("accel_hardware") : t("accel_simulation")}
     </span>
   );
 
@@ -490,17 +571,42 @@ export default function AIHardwareAccelerator() {
     <div style={{ minHeight: "100vh", position: "relative" }}>
       <FarmBackground />
       <div style={{ position: "relative", zIndex: 50 }}>
-        <DashboardHeader lastUpdateSeconds={lastUpdateSeconds} sensorNodeOnline={connectionStatus} />
+        <DashboardHeader
+          lastUpdateSeconds={lastUpdateSeconds}
+          sensorNodeOnline={connectionStatus}
+        />
       </div>
-      <div style={{ padding: "2rem", maxWidth: "1400px", margin: "0 auto", position: "relative", zIndex: 40 }}>
-
+      <div
+        style={{
+          padding: "2rem",
+          maxWidth: "1400px",
+          margin: "0 auto",
+          position: "relative",
+          zIndex: 40,
+        }}
+      >
         {/* Hardware badge row */}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1rem" }}>
-          <div style={{
-            display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.4rem 1rem",
-            borderRadius: 9999, backgroundColor: hwBadge.bg, border: `1px solid ${hwBadge.color}40`,
-            color: hwBadge.color, fontSize: "0.85rem", fontWeight: 600,
-          }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginBottom: "1rem",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              padding: "0.4rem 1rem",
+              borderRadius: 9999,
+              backgroundColor: hwBadge.bg,
+              border: `1px solid ${hwBadge.color}40`,
+              color: hwBadge.color,
+              fontSize: "0.85rem",
+              fontWeight: 600,
+            }}
+          >
             {hwBadge.icon} {hwBadge.label}
           </div>
         </div>
@@ -508,30 +614,103 @@ export default function AIHardwareAccelerator() {
         {/* Floating particle visualization */}
         <div style={{ marginBottom: "2.5rem", position: "relative" }}>
           <GlassSection style={{ padding: 0, overflow: "hidden" }}>
-            <h3 style={{
-              fontSize: "1.15rem", fontWeight: "bold", color: isDark ? "#FFFFFF" : "#1B3A20",
-              textAlign: "center", padding: "1.2rem 0 0",
-              letterSpacing: "0.06em", textTransform: "uppercase",
-            }}>
+            <h3
+              style={{
+                fontSize: "1.15rem",
+                fontWeight: "bold",
+                color: isDark ? "#FFFFFF" : "#1B3A20",
+                textAlign: "center",
+                padding: "1.2rem 0 0",
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+              }}
+            >
               AI Workflow in Action
             </h3>
-            <div style={{ position: "relative", width: "100%", height: "240px" }}>
-              <canvas ref={canvasRef} style={{ display: "block", width: "100%", height: "100%" }} />
+            <div
+              style={{ position: "relative", width: "100%", height: "240px" }}
+            >
+              <canvas
+                ref={canvasRef}
+                style={{ display: "block", width: "100%", height: "100%" }}
+              />
             </div>
           </GlassSection>
 
           {/* Live agents sidebar */}
-          <div style={{ position: "absolute", top: "1rem", right: "1rem", width: 240, zIndex: 100 }}>
+          <div
+            style={{
+              position: "absolute",
+              top: "1rem",
+              right: "1rem",
+              width: 240,
+              zIndex: 100,
+            }}
+          >
             <GlassSection style={{ padding: "1rem" }}>
-              <h4 style={{ fontSize: "0.85rem", fontWeight: "bold", color: "#2ECC71", marginBottom: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <h4
+                style={{
+                  fontSize: "0.85rem",
+                  fontWeight: "bold",
+                  color: "#2ECC71",
+                  marginBottom: "0.75rem",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
                 Active Agents
               </h4>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                {["Supervisor", "Trend", "Output", "Ingress", "Health", "Alert", "Weather", "Response"].map((a) => (
-                  <div key={a} style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                    <div style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: "#2ECC71", boxShadow: "0 0 6px #2ECC71" }} />
-                    <span style={{ fontSize: "0.8rem", color: isDark ? "#E5E7EB" : "#1B3A20" }}>{a}</span>
-                    <span style={{ fontSize: "0.65rem", color: isDark ? "#A7F3D0" : "#15803D", marginLeft: "auto" }}>Live</span>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "0.5rem",
+                }}
+              >
+                {[
+                  "Supervisor",
+                  "Trend",
+                  "Output",
+                  "Ingress",
+                  "Health",
+                  "Alert",
+                  "Weather",
+                  "Response",
+                ].map((a) => (
+                  <div
+                    key={a}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.6rem",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        backgroundColor: "#2ECC71",
+                        boxShadow: "0 0 6px #2ECC71",
+                      }}
+                    />
+                    <span
+                      style={{
+                        fontSize: "0.8rem",
+                        color: isDark ? "#E5E7EB" : "#1B3A20",
+                      }}
+                    >
+                      {a}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "0.65rem",
+                        color: isDark ? "#A7F3D0" : "#15803D",
+                        marginLeft: "auto",
+                      }}
+                    >
+                      Live
+                    </span>
                   </div>
                 ))}
               </div>
@@ -540,26 +719,108 @@ export default function AIHardwareAccelerator() {
         </div>
 
         {/* Control Buttons */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.5rem", marginBottom: "2rem" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gap: "1.5rem",
+            marginBottom: "2rem",
+          }}
+        >
           <GlassSection style={{ padding: "2rem", textAlign: "center" }}>
-            <CloudRain style={{ width: "2rem", height: "2rem", color: "#2563EB", margin: "0 auto 1rem" }} />
-            <h3 style={{ fontSize: "1.125rem", fontWeight: "bold", color: isDark ? "#FFFFFF" : "#1B3A20", marginBottom: "1rem" }}>Rain Predictor</h3>
-            <Button onClick={predictRain} disabled={loadingRain} style={{ width: "100%", backgroundColor: "#2ECC71", color: "white", padding: "0.75rem" }}>
-              {loadingRain ? t('accel_sending') : t('accel_predict_rain')}
+            <CloudRain
+              style={{
+                width: "2rem",
+                height: "2rem",
+                color: "#2563EB",
+                margin: "0 auto 1rem",
+              }}
+            />
+            <h3
+              style={{
+                fontSize: "1.125rem",
+                fontWeight: "bold",
+                color: isDark ? "#FFFFFF" : "#1B3A20",
+                marginBottom: "1rem",
+              }}
+            >
+              Rain Predictor
+            </h3>
+            <Button
+              onClick={predictRain}
+              disabled={loadingRain}
+              style={{
+                width: "100%",
+                backgroundColor: "#2ECC71",
+                color: "white",
+                padding: "0.75rem",
+              }}
+            >
+              {loadingRain ? t("accel_sending") : t("accel_predict_rain")}
             </Button>
           </GlassSection>
           <GlassSection style={{ padding: "2rem", textAlign: "center" }}>
-            <Leaf style={{ width: "2rem", height: "2rem", color: "#27AE60", margin: "0 auto 1rem" }} />
-            <h3 style={{ fontSize: "1.125rem", fontWeight: "bold", color: isDark ? "#FFFFFF" : "#1B3A20", marginBottom: "1rem" }}>Crop Health</h3>
-            <Button onClick={runSensorFusion} disabled={loadingFusion} style={{ width: "100%", backgroundColor: "#2ECC71", color: "white", padding: "0.75rem" }}>
-              {loadingFusion ? t('accel_sending') : t('accel_health_check')}
+            <Leaf
+              style={{
+                width: "2rem",
+                height: "2rem",
+                color: "#27AE60",
+                margin: "0 auto 1rem",
+              }}
+            />
+            <h3
+              style={{
+                fontSize: "1.125rem",
+                fontWeight: "bold",
+                color: isDark ? "#FFFFFF" : "#1B3A20",
+                marginBottom: "1rem",
+              }}
+            >
+              Sensor Fusion
+            </h3>
+            <Button
+              onClick={runSensorFusion}
+              disabled={loadingFusion}
+              style={{
+                width: "100%",
+                backgroundColor: "#2ECC71",
+                color: "white",
+                padding: "0.75rem",
+              }}
+            >
+              {loadingFusion ? t("accel_sending") : t("accel_sensor_fusion")}
             </Button>
           </GlassSection>
           <GlassSection style={{ padding: "2rem", textAlign: "center" }}>
-            <Droplets style={{ width: "2rem", height: "2rem", color: "#8B5CF6", margin: "0 auto 1rem" }} />
-            <h3 style={{ fontSize: "1.125rem", fontWeight: "bold", color: isDark ? "#FFFFFF" : "#1B3A20", marginBottom: "1rem" }}>Irrigation Model</h3>
-            <Button onClick={runCombinedAnalysis} disabled={loadingCombined} style={{ width: "100%", backgroundColor: "#2ECC71", color: "white", padding: "0.75rem" }}>
-              {loadingCombined ? t('accel_sending') : t('accel_run_analysis')}
+            <Droplets
+              style={{
+                width: "2rem",
+                height: "2rem",
+                color: "#8B5CF6",
+                margin: "0 auto 1rem",
+              }}
+            />
+            <h3
+              style={{
+                fontSize: "1.125rem",
+                fontWeight: "bold",
+                color: isDark ? "#FFFFFF" : "#1B3A20",
+                marginBottom: "1rem",
+              }}
+            >
+              Overall Analysis
+            </h3>
+            <Button
+              onClick={runCombinedAnalysis}
+              disabled={loadingCombined}
+              style={{
+                width: "100%",
+                backgroundColor: "#2ECC71",
+                color: "white",
+                padding: "0.75rem",
+              }}
+            >
+              {loadingCombined ? t("accel_sending") : t("accel_run_analysis")}
             </Button>
           </GlassSection>
         </div>
@@ -567,90 +828,458 @@ export default function AIHardwareAccelerator() {
         {/* ─── Rain Prediction Results ─── */}
         {rainPrediction && (
           <GlassSection style={{ marginBottom: "1.5rem", padding: "2rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-              <h3 style={{ fontSize: "1.25rem", fontWeight: "bold", color: isDark ? "#FFFFFF" : "#1B3A20" }}>️ Rain Prediction</h3>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1.5rem",
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: "1.25rem",
+                  fontWeight: "bold",
+                  color: isDark ? "#FFFFFF" : "#1B3A20",
+                }}
+              >
+                ️ Rain Prediction
+              </h3>
               {modeBadge(rainPrediction.hardware_mode)}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
-              <div style={{ padding: "1.5rem", borderRadius: "0.5rem", backgroundColor: getRiskColor(rainPrediction.prediction.rain_probability).bg }}>
-                <p style={{ fontSize: "0.875rem", fontWeight: 600, color: "#374151", marginBottom: "0.5rem" }}>Rain Probability</p>
-                <p style={{ fontSize: "2.25rem", fontWeight: "bold", color: getRiskColor(rainPrediction.prediction.rain_probability).text }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "1.5rem",
+              }}
+            >
+              <div
+                style={{
+                  padding: "1.5rem",
+                  borderRadius: "0.5rem",
+                  backgroundColor: getRiskColor(
+                    rainPrediction.prediction.rain_probability
+                  ).bg,
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: "0.875rem",
+                    fontWeight: 600,
+                    color: "#374151",
+                    marginBottom: "0.5rem",
+                  }}
+                >
+                  Rain Probability
+                </p>
+                <p
+                  style={{
+                    fontSize: "2.25rem",
+                    fontWeight: "bold",
+                    color: getRiskColor(
+                      rainPrediction.prediction.rain_probability
+                    ).text,
+                  }}
+                >
                   {rainPrediction.prediction.rain_probability}%
                 </p>
               </div>
-              <div style={{ padding: "1.5rem", backgroundColor: isDark ? "rgba(46,204,113,0.1)" : "rgba(46,204,113,0.05)", borderRadius: "0.5rem" }}>
-                <p style={{ fontSize: "0.875rem", fontWeight: 600, color: isDark ? "#FFFFFF" : "#1B3A20", marginBottom: "0.5rem" }}>Recommendation</p>
-                <p style={{ color: isDark ? "#FFFFFF" : "#1B3A20", fontSize: "0.95rem" }}>{rainPrediction.farmer_recommendation}</p>
+              <div
+                style={{
+                  padding: "1.5rem",
+                  backgroundColor: isDark
+                    ? "rgba(46,204,113,0.1)"
+                    : "rgba(46,204,113,0.05)",
+                  borderRadius: "0.5rem",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: "0.875rem",
+                    fontWeight: 600,
+                    color: isDark ? "#FFFFFF" : "#1B3A20",
+                    marginBottom: "0.5rem",
+                  }}
+                >
+                  Recommendation
+                </p>
+                <p
+                  style={{
+                    color: isDark ? "#FFFFFF" : "#1B3A20",
+                    fontSize: "0.95rem",
+                  }}
+                >
+                  {rainPrediction.farmer_recommendation}
+                </p>
               </div>
             </div>
             {rainPrediction.ai_insights && (
-              <div style={{ marginTop: "1.5rem", padding: "1.5rem", backgroundColor: "rgba(99,102,241,0.1)", borderRadius: "0.5rem", borderLeft: "4px solid #6366F1" }}>
-                <p style={{ fontSize: "0.95rem", fontWeight: 700, color: isDark ? "#A5B4FC" : "#4F46E5", marginBottom: "0.75rem" }}> LLM Analysis (Groq AI)</p>
-                <p style={{ color: isDark ? "#E5E7EB" : "#374151", fontSize: "0.9rem", lineHeight: 1.7, whiteSpace: "pre-line" }}>{rainPrediction.ai_insights}</p>
+              <div
+                style={{
+                  marginTop: "1.5rem",
+                  padding: "1.5rem",
+                  backgroundColor: "rgba(99,102,241,0.1)",
+                  borderRadius: "0.5rem",
+                  borderLeft: "4px solid #6366F1",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: "0.95rem",
+                    fontWeight: 700,
+                    color: isDark ? "#A5B4FC" : "#4F46E5",
+                    marginBottom: "0.75rem",
+                  }}
+                >
+                  {" "}
+                  LLM Analysis (Groq AI)
+                </p>
+                <p
+                  style={{
+                    color: isDark ? "#E5E7EB" : "#374151",
+                    fontSize: "0.9rem",
+                    lineHeight: 1.7,
+                    whiteSpace: "pre-line",
+                  }}
+                >
+                  {rainPrediction.ai_insights}
+                </p>
               </div>
             )}
           </GlassSection>
         )}
 
-        {/* ─── Crop Health Results ─── */}
+        {/* ─── Sensor Fusion Results ─── */}
         {sensorFusion && (
           <GlassSection style={{ marginBottom: "1.5rem", padding: "2rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-              <h3 style={{ fontSize: "1.25rem", fontWeight: "bold", color: isDark ? "#FFFFFF" : "#1B3A20" }}> Plant Health Check</h3>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1.5rem",
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: "1.25rem",
+                  fontWeight: "bold",
+                  color: isDark ? "#FFFFFF" : "#1B3A20",
+                }}
+              >
+                Sensor Fusion Analysis
+              </h3>
               {modeBadge(sensorFusion.hardware_mode)}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1.5rem" }}>
-              <div style={{ padding: "1.5rem", backgroundColor: isDark ? "rgba(46,204,113,0.1)" : "rgba(46,204,113,0.05)", borderRadius: "0.5rem" }}>
-                <p style={{ fontSize: "0.85rem", color: isDark ? "#E5E7EB" : "#1B3A20", marginBottom: "0.5rem" }}>Plant Health Score</p>
-                <p style={{ fontSize: "1.75rem", fontWeight: "bold", color: "#2ECC71" }}>{sensorFusion.fpga_result?.fusion_score ?? "N/A"}</p>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: "1.5rem",
+              }}
+            >
+              <div
+                style={{
+                  padding: "1.5rem",
+                  backgroundColor: isDark
+                    ? "rgba(46,204,113,0.1)"
+                    : "rgba(46,204,113,0.05)",
+                  borderRadius: "0.5rem",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: "0.85rem",
+                    color: isDark ? "#E5E7EB" : "#1B3A20",
+                    marginBottom: "0.5rem",
+                  }}
+                >
+                  Plant Health Score
+                </p>
+                <p
+                  style={{
+                    fontSize: "1.75rem",
+                    fontWeight: "bold",
+                    color: "#2ECC71",
+                  }}
+                >
+                  {sensorFusion.fpga_result?.fusion_score ?? "N/A"}
+                </p>
               </div>
-              <div style={{ padding: "1.5rem", backgroundColor: isDark ? "rgba(249,115,22,0.1)" : "rgba(249,115,22,0.05)", borderRadius: "0.5rem" }}>
-                <p style={{ fontSize: "0.85rem", color: isDark ? "#E5E7EB" : "#1B3A20", marginBottom: "0.5rem" }}>Stress Level</p>
-                <p style={{ fontSize: "1.75rem", fontWeight: "bold", color: "#F97316" }}>{sensorFusion.fpga_result?.stress_index ?? "N/A"}%</p>
+              <div
+                style={{
+                  padding: "1.5rem",
+                  backgroundColor: isDark
+                    ? "rgba(249,115,22,0.1)"
+                    : "rgba(249,115,22,0.05)",
+                  borderRadius: "0.5rem",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: "0.85rem",
+                    color: isDark ? "#E5E7EB" : "#1B3A20",
+                    marginBottom: "0.5rem",
+                  }}
+                >
+                  Stress Level
+                </p>
+                <p
+                  style={{
+                    fontSize: "1.75rem",
+                    fontWeight: "bold",
+                    color: "#F97316",
+                  }}
+                >
+                  {sensorFusion.fpga_result?.stress_index ?? "N/A"}%
+                </p>
               </div>
-              <div style={{ padding: "1.5rem", backgroundColor: isDark ? "rgba(59,130,246,0.1)" : "rgba(59,130,246,0.05)", borderRadius: "0.5rem" }}>
-                <p style={{ fontSize: "0.85rem", color: isDark ? "#E5E7EB" : "#1B3A20", marginBottom: "0.5rem" }}>Alert Level</p>
-                <p style={{ fontSize: "1.75rem", fontWeight: "bold", color: "#3B82F6" }}>{sensorFusion.fpga_result?.alert_level ?? "Normal"}</p>
+              <div
+                style={{
+                  padding: "1.5rem",
+                  backgroundColor: isDark
+                    ? "rgba(59,130,246,0.1)"
+                    : "rgba(59,130,246,0.05)",
+                  borderRadius: "0.5rem",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: "0.85rem",
+                    color: isDark ? "#E5E7EB" : "#1B3A20",
+                    marginBottom: "0.5rem",
+                  }}
+                >
+                  Alert Level
+                </p>
+                <p
+                  style={{
+                    fontSize: "1.75rem",
+                    fontWeight: "bold",
+                    color: "#3B82F6",
+                  }}
+                >
+                  {sensorFusion.fpga_result?.alert_level ?? "Normal"}
+                </p>
               </div>
             </div>
             {sensorFusion.ai_insights && (
-              <div style={{ marginTop: "1.5rem", padding: "1.5rem", backgroundColor: "rgba(99,102,241,0.1)", borderRadius: "0.5rem", borderLeft: "4px solid #6366F1" }}>
-                <p style={{ fontSize: "0.95rem", fontWeight: 700, color: isDark ? "#A5B4FC" : "#4F46E5", marginBottom: "0.75rem" }}> LLM Analysis (Groq AI)</p>
-                <p style={{ color: isDark ? "#E5E7EB" : "#374151", fontSize: "0.9rem", lineHeight: 1.7, whiteSpace: "pre-line" }}>{sensorFusion.ai_insights}</p>
+              <div
+                style={{
+                  marginTop: "1.5rem",
+                  padding: "1.5rem",
+                  backgroundColor: "rgba(99,102,241,0.1)",
+                  borderRadius: "0.5rem",
+                  borderLeft: "4px solid #6366F1",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: "0.95rem",
+                    fontWeight: 700,
+                    color: isDark ? "#A5B4FC" : "#4F46E5",
+                    marginBottom: "0.75rem",
+                  }}
+                >
+                  {" "}
+                  LLM Analysis (Groq AI)
+                </p>
+                <p
+                  style={{
+                    color: isDark ? "#E5E7EB" : "#374151",
+                    fontSize: "0.9rem",
+                    lineHeight: 1.7,
+                    whiteSpace: "pre-line",
+                  }}
+                >
+                  {sensorFusion.ai_insights}
+                </p>
               </div>
             )}
           </GlassSection>
         )}
 
-        {/* ─── Irrigation Model Results ─── */}
+        {/* ─── Overall Analysis Results ─── */}
         {combinedAnalysis && (
           <GlassSection style={{ padding: "2rem" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-              <h3 style={{ fontSize: "1.25rem", fontWeight: "bold", color: isDark ? "#FFFFFF" : "#1B3A20" }}>Irrigation Recommendation</h3>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1.5rem",
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: "1.25rem",
+                  fontWeight: "bold",
+                  color: isDark ? "#FFFFFF" : "#1B3A20",
+                }}
+              >
+                Overall Analysis
+              </h3>
               {modeBadge(combinedAnalysis.hardware_mode)}
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "1.5rem", marginBottom: "1.5rem" }}>
-              <div style={{ padding: "1.5rem", backgroundColor: isDark ? "rgba(139,92,246,0.1)" : "rgba(139,92,246,0.05)", borderRadius: "0.5rem" }}>
-                <p style={{ fontSize: "0.85rem", color: isDark ? "#E5E7EB" : "#1B3A20", marginBottom: "0.5rem" }}>Overall Risk</p>
-                <p style={{ fontSize: "1.5rem", fontWeight: "bold", color: "#8B5CF6" }}>{combinedAnalysis.combined_analysis?.overall_risk_level ?? "Low"}</p>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: "1.5rem",
+                marginBottom: "1.5rem",
+              }}
+            >
+              <div
+                style={{
+                  padding: "1.5rem",
+                  backgroundColor: isDark
+                    ? "rgba(139,92,246,0.1)"
+                    : "rgba(139,92,246,0.05)",
+                  borderRadius: "0.5rem",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: "0.85rem",
+                    color: isDark ? "#E5E7EB" : "#1B3A20",
+                    marginBottom: "0.5rem",
+                  }}
+                >
+                  Overall Risk
+                </p>
+                <p
+                  style={{
+                    fontSize: "1.5rem",
+                    fontWeight: "bold",
+                    color: "#8B5CF6",
+                  }}
+                >
+                  {combinedAnalysis.combined_analysis?.overall_risk_level ??
+                    "Low"}
+                </p>
               </div>
-              <div style={{ padding: "1.5rem", backgroundColor: isDark ? "rgba(46,204,113,0.1)" : "rgba(46,204,113,0.05)", borderRadius: "0.5rem" }}>
-                <p style={{ fontSize: "0.85rem", color: isDark ? "#E5E7EB" : "#1B3A20", marginBottom: "0.5rem" }}>Plant Stress</p>
-                <p style={{ fontSize: "1.5rem", fontWeight: "bold", color: "#2ECC71" }}>{combinedAnalysis.combined_analysis?.stress_index ?? "N/A"}%</p>
+              <div
+                style={{
+                  padding: "1.5rem",
+                  backgroundColor: isDark
+                    ? "rgba(46,204,113,0.1)"
+                    : "rgba(46,204,113,0.05)",
+                  borderRadius: "0.5rem",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: "0.85rem",
+                    color: isDark ? "#E5E7EB" : "#1B3A20",
+                    marginBottom: "0.5rem",
+                  }}
+                >
+                  Plant Stress
+                </p>
+                <p
+                  style={{
+                    fontSize: "1.5rem",
+                    fontWeight: "bold",
+                    color: "#2ECC71",
+                  }}
+                >
+                  {combinedAnalysis.combined_analysis?.stress_index ?? "N/A"}%
+                </p>
               </div>
-              <div style={{ padding: "1.5rem", backgroundColor: isDark ? "rgba(59,130,246,0.1)" : "rgba(59,130,246,0.05)", borderRadius: "0.5rem" }}>
-                <p style={{ fontSize: "0.85rem", color: isDark ? "#E5E7EB" : "#1B3A20", marginBottom: "0.5rem" }}>Rain Chance</p>
-                <p style={{ fontSize: "1.5rem", fontWeight: "bold", color: "#3B82F6" }}>{combinedAnalysis.combined_analysis?.rain_probability ?? "N/A"}%</p>
+              <div
+                style={{
+                  padding: "1.5rem",
+                  backgroundColor: isDark
+                    ? "rgba(59,130,246,0.1)"
+                    : "rgba(59,130,246,0.05)",
+                  borderRadius: "0.5rem",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: "0.85rem",
+                    color: isDark ? "#E5E7EB" : "#1B3A20",
+                    marginBottom: "0.5rem",
+                  }}
+                >
+                  Rain Chance
+                </p>
+                <p
+                  style={{
+                    fontSize: "1.5rem",
+                    fontWeight: "bold",
+                    color: "#3B82F6",
+                  }}
+                >
+                  {combinedAnalysis.combined_analysis?.rain_probability ??
+                    "N/A"}
+                  %
+                </p>
               </div>
             </div>
-            <div style={{ padding: "2rem", backgroundColor: isDark ? "rgba(46,204,113,0.15)" : "rgba(46,204,113,0.08)", borderRadius: "0.5rem", borderLeft: "4px solid #2ECC71" }}>
-              <p style={{ fontSize: "1.1rem", fontWeight: 700, color: isDark ? "#E5E7EB" : "#1B3A20", marginBottom: "1rem" }}> What You Should Do Now:</p>
-              <p style={{ color: isDark ? "#F3F4F6" : "#374151", fontSize: "1rem", lineHeight: 1.6 }}>{combinedAnalysis.combined_analysis?.recommendation}</p>
+            <div
+              style={{
+                padding: "2rem",
+                backgroundColor: isDark
+                  ? "rgba(46,204,113,0.15)"
+                  : "rgba(46,204,113,0.08)",
+                borderRadius: "0.5rem",
+                borderLeft: "4px solid #2ECC71",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: "1.1rem",
+                  fontWeight: 700,
+                  color: isDark ? "#E5E7EB" : "#1B3A20",
+                  marginBottom: "1rem",
+                }}
+              >
+                {" "}
+                What You Should Do Now:
+              </p>
+              <p
+                style={{
+                  color: isDark ? "#F3F4F6" : "#374151",
+                  fontSize: "1rem",
+                  lineHeight: 1.6,
+                }}
+              >
+                {combinedAnalysis.combined_analysis?.recommendation}
+              </p>
             </div>
             {combinedAnalysis.ai_enhancement && (
-              <div style={{ marginTop: "1.5rem", padding: "1.5rem", backgroundColor: "rgba(99,102,241,0.1)", borderRadius: "0.5rem", borderLeft: "4px solid #6366F1" }}>
-                <p style={{ fontSize: "0.95rem", fontWeight: 700, color: isDark ? "#A5B4FC" : "#4F46E5", marginBottom: "0.75rem" }}> LLM Deep Analysis (Groq AI)</p>
-                <p style={{ color: isDark ? "#E5E7EB" : "#374151", fontSize: "0.9rem", lineHeight: 1.7, whiteSpace: "pre-line" }}>{combinedAnalysis.ai_enhancement}</p>
+              <div
+                style={{
+                  marginTop: "1.5rem",
+                  padding: "1.5rem",
+                  backgroundColor: "rgba(99,102,241,0.1)",
+                  borderRadius: "0.5rem",
+                  borderLeft: "4px solid #6366F1",
+                }}
+              >
+                <p
+                  style={{
+                    fontSize: "0.95rem",
+                    fontWeight: 700,
+                    color: isDark ? "#A5B4FC" : "#4F46E5",
+                    marginBottom: "0.75rem",
+                  }}
+                >
+                  {" "}
+                  LLM Deep Analysis (Groq AI)
+                </p>
+                <p
+                  style={{
+                    color: isDark ? "#E5E7EB" : "#374151",
+                    fontSize: "0.9rem",
+                    lineHeight: 1.7,
+                    whiteSpace: "pre-line",
+                  }}
+                >
+                  {combinedAnalysis.ai_enhancement}
+                </p>
               </div>
             )}
           </GlassSection>

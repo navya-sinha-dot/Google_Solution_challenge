@@ -30,7 +30,7 @@ class AgriculturalQAAssistant:
         
         try:
             self.llm = ChatGroq(
-                temperature=0.7,
+                temperature=0.25,
                 model_name="llama-3.1-8b-instant",
                 api_key=api_key
             )
@@ -113,7 +113,8 @@ Respond in JSON format:
             # Build context from sensor data
             context = self._format_sensor_context(sensor_data, llm_analysis, historical_data)
             
-            prompt = f"""You are AgroBot, an expert agricultural advisor replying via WhatsApp. Keep your ENTIRE response under 800 characters. Be concise and conversational.
+            prompt = f"""You are AgroBot, a highly efficient expert agricultural advisor replying via WhatsApp.
+Use ALL available sensor readings and FPGA/accelerator analysis to generate a detailed advisory.
 
 FARM DATA:
 {context}
@@ -121,14 +122,20 @@ FARM DATA:
 FARMER'S QUESTION:
 {question}
 
-Respond in this EXACT format (no extra sections):
-🌾 AgroBot:
-[Your brief answer in 2-3 sentences]
+Instructions:
+- Begin with a direct answer to the farmer's question.
+- Use the exact sensor readings from FARM DATA, and NEVER invent values.
+- Provide a detailed advisory that includes: Summary, Condition, Recommendation, and Risk assessment.
+- Bold ONLY the most important numeric values using markdown bold, such as critical thresholds or values that drive the recommendation. Leave other numbers unchanged.
+- Keep the language clear, practical, and actionable for a farmer.
+- Use plain WhatsApp text only: no code blocks, no JSON, no tables.
 
-💡 Tip: [One actionable suggestion based on conditions]
-
-Keep it short and farmer-friendly. No long explanations. No extra headers."""
-            
+Example structure:
+Summary: ...
+Condition: ...
+Recommendation: ...
+Risk: ...
+"""
             response = self.llm.invoke(prompt)
             answer_text = response.content
             
@@ -151,30 +158,62 @@ Keep it short and farmer-friendly. No long explanations. No extra headers."""
         """Format sensor data for LLM context"""
         context = "CURRENT READINGS:\n"
         
-        # Current values
+        # Current environmental values
         if "env" in sensor_data:
             env = sensor_data["env"]
             context += f"- Temperature: {env.get('t', 'N/A')}°C\n"
             context += f"- Humidity: {env.get('h', 'N/A')}%\n"
             context += f"- Pressure: {env.get('p', 'N/A')} hPa\n"
+            if env.get('dew_point') is not None:
+                context += f"- Dew Point: {env.get('dew_point')}°C\n"
         
+        # Soil values
         if "soil" in sensor_data:
             soil = sensor_data["soil"]
             context += f"- Soil Temperature: {soil.get('t', 'N/A')}°C\n"
             context += f"- Soil Moisture: {soil.get('m', 'N/A')}%\n"
+            if soil.get('ec') is not None:
+                context += f"- Soil EC: {soil.get('ec', 'N/A')} mS/cm\n"
         
+        # Wind values
         if "wind" in sensor_data:
             wind = sensor_data["wind"]
             context += f"- Wind Speed: {wind.get('s', 'N/A')} m/s\n"
             context += f"- Wind Direction: {wind.get('d', 'N/A')}\n"
+            if wind.get('gust') is not None:
+                context += f"- Wind Gust: {wind.get('gust', 'N/A')} m/s\n"
         
-        # FPGA Analysis
+        # Rain and light values
+        if "rain" in sensor_data:
+            rain = sensor_data["rain"]
+            context += f"- Rainfall: {rain.get('mm', 'N/A')} mm\n"
+            context += f"- Rain Rate: {rain.get('rate', 'N/A')} mm/h\n"
+        if "light" in sensor_data:
+            light = sensor_data["light"]
+            context += f"- Light Intensity: {light.get('lux', 'N/A')} lux\n"
+            context += f"- PAR: {light.get('par', 'N/A')}\n"
+        
+        # Air quality and power
+        if "air_quality" in sensor_data:
+            air = sensor_data["air_quality"]
+            context += f"- PM2.5: {air.get('pm25', 'N/A')} µg/m3\n"
+            context += f"- PM10: {air.get('pm10', 'N/A')} µg/m3\n"
+        if "uv_index" in sensor_data:
+            context += f"- UV Index: {sensor_data.get('uv_index', 'N/A')}\n"
+        if "power" in sensor_data:
+            power = sensor_data["power"]
+            context += f"- Battery Voltage: {power.get('battery_voltage', 'N/A')} V\n"
+            context += f"- Solar Voltage: {power.get('solar_voltage', 'N/A')} V\n"
+        
+        # FPGA / accelerator analysis
         if "accelerator_results" in sensor_data:
             acc = sensor_data["accelerator_results"]
             context += f"\nFPGA ANALYSIS:\n"
             context += f"- Plant Health Score: {acc.get('sf_score', 'N/A')}/100\n"
             context += f"- Stress Level: {acc.get('sf_stress', 'N/A')}/100\n"
             context += f"- Rain Probability: {acc.get('rp_probability', 'N/A')}%\n"
+            if acc.get('alert_level') is not None:
+                context += f"- Alert Level: {acc.get('alert_level')}\n"
         
         # LLM Insights
         if llm_analysis and "decision" in llm_analysis:
@@ -188,6 +227,9 @@ Keep it short and farmer-friendly. No long explanations. No extra headers."""
                 avg_humid = sum(d.get('humidity', 0) for d in historical_data) / len(historical_data)
                 context += f"- Average Temperature: {avg_temp:.1f}°C\n"
                 context += f"- Average Humidity: {avg_humid:.1f}%\n"
+                if any(d.get('rainfall') is not None for d in historical_data):
+                    avg_rain = sum(d.get('rainfall', 0) for d in historical_data) / len(historical_data)
+                    context += f"- Average Rainfall: {avg_rain:.1f} mm\n"
         
         return context
     

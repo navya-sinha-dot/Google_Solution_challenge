@@ -1177,19 +1177,28 @@ async def get_advisor_insights(request: AdvisorRequest):
         temp = sensor_data.get("temperature", 25)
         humidity = sensor_data.get("humidity", 60)
         soil_moisture = sensor_data.get("soilMoisture", sensor_data.get("soil_moisture", 50))
+        soil_temp = sensor_data.get("soilTemperature", sensor_data.get("soil_temperature", "N/A"))
         wind_speed = sensor_data.get("windSpeed", sensor_data.get("wind_speed", 5))
+        wind_dir = sensor_data.get("windDirection", sensor_data.get("wind_direction", "N/A"))
         rainfall = sensor_data.get("rainfall", 0)
+        rain_rate = sensor_data.get("rainRate", sensor_data.get("rain_rate", "N/A"))
         light = sensor_data.get("lightIntensity", sensor_data.get("light_level", 70))
         uv_index = sensor_data.get("uvIndex", sensor_data.get("uv_index", 2))
         pressure = sensor_data.get("pressure", 1013)
+        air_pm25 = sensor_data.get("airQualityPM25", sensor_data.get("pm25", "N/A"))
+        air_pm10 = sensor_data.get("airQualityPM10", sensor_data.get("pm10", "N/A"))
+        battery_voltage = sensor_data.get("batteryVoltage", sensor_data.get("battery_voltage", "N/A"))
+        solar_voltage = sensor_data.get("solarVoltage", sensor_data.get("solar_voltage", "N/A"))
         
         prompts = {
             "alerts": f"""You are a smart farm AI advisor. Based on these LIVE sensor readings from the farm:
-- Temperature: {temp}°C, Humidity: {humidity}%, Wind: {wind_speed} km/h, Rainfall: {rainfall}mm
-- Soil Moisture: {soil_moisture}%, Light: {light}%, UV Index: {uv_index}, Pressure: {pressure}hPa
+- Temperature: {temp}°C, Humidity: {humidity}%, Wind: {wind_speed} km/h ({wind_dir}), Rainfall: {rainfall}mm
+- Soil Moisture: {soil_moisture}%, Soil Temperature: {soil_temp}°C, Light: {light} lux, UV Index: {uv_index}
+- Pressure: {pressure} hPa, Rain Rate: {rain_rate} mm/h, PM2.5: {air_pm25}, PM10: {air_pm10}
+- Battery Voltage: {battery_voltage} V, Solar Voltage: {solar_voltage} V
 
 Generate 4-5 farming alerts with severity levels. For each alert, provide:
-- A severity (danger/warning/info/success) 
+- A severity (danger/warning/info/success)
 - A short title
 - A specific actionable message that a farmer can understand
 
@@ -1249,13 +1258,18 @@ Identify 4 pests/diseases most likely to appear in these conditions. For each pr
 Format as JSON array: [{{"name":"Powdery Mildew","risk":"High","symptoms":"White powder...","remedy":"Neem oil spray...","prevention":"Improve air circulation..."}}]
 Only output valid JSON, no markdown.""",
 
-            "overview": f"""You are a farm AI assistant. Give a brief, friendly farm overview based on:
-- Temperature: {temp}°C, Humidity: {humidity}%, Wind: {wind_speed} km/h
-- Soil Moisture: {soil_moisture}%, Light: {light}%, Rainfall: {rainfall}mm
+            "overview": f"""You are a farm AI assistant. Based on these live sensor readings, provide a detailed farm advisory.
+- Temperature: {temp}°C, Humidity: {humidity}%, Pressure: {pressure} hPa
+- Wind: {wind_speed} km/h ({wind_dir}), Rainfall: {rainfall}mm, Rain Rate: {rain_rate} mm/h
+- Soil Moisture: {soil_moisture}%, Soil Temperature: {soil_temp}°C, Light Intensity: {light} lux
+- UV Index: {uv_index}, PM2.5: {air_pm25}, PM10: {air_pm10}
+- Battery Voltage: {battery_voltage} V, Solar Voltage: {solar_voltage} V
 
-Provide a 3-sentence summary of how the farm is doing today and what the farmer should focus on.
-Return as JSON: {{"summary":"Your farm is...","mood":"good","focus":"Focus on..."}}
-Only output valid JSON, no markdown."""
+Use ALL available sensor readings and provide a detailed advisory with four sections: Summary, Condition, Recommendation, and Risk.
+Bold only the most important numeric values using <strong>...</strong> and keep all other numbers unchanged.
+Return valid JSON with keys: "summary", "focus_points", and "details".
+Example: {{"summary":"...","focus_points":["...","..."],"details":"..."}}
+Only output valid JSON. No markdown outside of <strong> tags."""
         }
         
         prompt = prompts.get(request.category, prompts["overview"])
