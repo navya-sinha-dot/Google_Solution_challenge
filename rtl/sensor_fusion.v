@@ -6,6 +6,8 @@
 // Resources: 4x DSP48E1 slices
 //============================================================================
 
+
+// signal defination
 `timescale 1ns / 1ps
 `include "sensor_fusion_pkg.vh"
 

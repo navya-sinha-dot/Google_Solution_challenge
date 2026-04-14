@@ -8,7 +8,7 @@
 `timescale 1ns / 1ps
 `include "sensor_fusion_pkg.vh"
 
-// Dummy comment for commit
+// signal defination
 module sensor_fusion_axi #(
     parameter C_S_AXI_DATA_WIDTH = 32,
     parameter C_S_AXI_ADDR_WIDTH = 8

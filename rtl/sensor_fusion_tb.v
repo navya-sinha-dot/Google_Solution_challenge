@@ -6,6 +6,7 @@
 `timescale 1ns / 1ps
 `include "sensor_fusion_pkg.vh"
 
+// signal defination
 module sensor_fusion_tb;
 
     // ========================================================================

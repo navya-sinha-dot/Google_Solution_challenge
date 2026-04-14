@@ -7,6 +7,7 @@
  * Outputs: rain_probability, weather_stress, rain_alert
  */
 
+// signal defination
 module rain_predictor (
     input clk,
     input rst_n,

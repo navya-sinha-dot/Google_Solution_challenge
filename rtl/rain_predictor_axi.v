@@ -3,6 +3,7 @@
  * Provides AXI4-Lite slave interface for rain predictor module
  */
 
+// signal defination
 module rain_predictor_axi (
     // AXI4-Lite Interface
     input clk,
