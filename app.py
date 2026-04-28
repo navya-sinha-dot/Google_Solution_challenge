@@ -56,16 +56,22 @@ print(f"Twilio Number: {TWILIO_WHATSAPP_NUMBER}" if TWILIO_WHATSAPP_NUMBER else 
 
 # Initialize FastAPI app
 app = FastAPI(title="Weather Alert System")
+origins = [
+    "https://google-hack-kgp5.vercel.app",
+    "http://localhost:5173",
+]
 
-# CRITICAL: Add CORS middleware BEFORE including routers
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins (for development)
+    allow_origins=origins,   # ✅ FIXED
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+@app.options("/{full_path:path}")
+async def options_handler():
+    return {"status": "ok"}
 # Initialize thread pool for LangGraph invocation
 executor = ThreadPoolExecutor(max_workers=5)
 
@@ -335,7 +341,7 @@ async def send_otp(request: SendOtpRequest):
     logger.info(f"==========================================")
     
     # In production, integrate with a paid MSG91 or Twilio plan here.
-    return {"status": "success", "message": "OTP processed successfully. Check your backend terminal for the code!"}
+    return {"status": "success", "message": "OTP processed successfully.", "otp": otp_code}
 
 @app.post("/api/auth/verify-otp")
 async def verify_otp(request: VerifyOtpRequest):

@@ -45,6 +45,9 @@ export default function Login() {
     const result = await sendOtp(phone);
     if (result.success) {
       setOtpSent(true);
+      if (result.otp) {
+        alert(`Your AgriHub Login OTP is: ${result.otp}`);
+      }
     } else {
       setError(result.message || 'Failed to send OTP. Check the number format (+91XXXXXXXXXX) or try again.');
     }

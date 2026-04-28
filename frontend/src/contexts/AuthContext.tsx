@@ -5,7 +5,7 @@ interface AuthContextType {
   hardwareConnected: boolean;
   connectHardware: (deviceId: string) => void;
   disconnectHardware: () => void;
-  sendOtp: (phone: string, isSignup?: boolean) => Promise<{ success: boolean; message?: string }>;
+  sendOtp: (phone: string, isSignup?: boolean) => Promise<{ success: boolean; message?: string; otp?: string }>;
   login: (phone: string, otp: string) => Promise<boolean>;
   logout: () => void;
 }
@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem('hardware_device_id');
   }, []);
 
-  const sendOtp = useCallback(async (phone: string, isSignup: boolean = false): Promise<{ success: boolean; message?: string }> => {
+  const sendOtp = useCallback(async (phone: string, isSignup: boolean = false): Promise<{ success: boolean; message?: string; otp?: string }> => {
     try {
       const response = await fetch("https://agentic-backend-lyx3.onrender.com/api/auth/send-otp", {
         method: "POST",
@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, message: data.detail || 'Failed to send OTP.' };
       }
       
-      return { success: data.status === "success" };
+      return { success: data.status === "success", otp: data.otp };
     } catch (error: any) {
       console.error('Error sending OTP:', error);
       return { success: false, message: 'Network error. Please try again.' };
