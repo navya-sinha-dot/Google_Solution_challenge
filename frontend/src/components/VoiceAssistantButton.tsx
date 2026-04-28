@@ -47,7 +47,7 @@ export function VoiceAssistantButton() {
     setIsProcessing(true);
     try {
       // Send to backend /api/chat endpoint for generic AI response
-      const response = await fetch("http://localhost:8000/api/chat", {
+      const response = await fetch("https://agentic-backend-lyx3.onrender.com/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text })

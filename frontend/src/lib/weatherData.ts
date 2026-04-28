@@ -1,7 +1,7 @@
 // Weather data integration with FastAPI backend
-// Connects to http://localhost:8000/api/sensors/
+// Connects to https://agentic-backend-lyx3.onrender.com/api/sensors/
 
-const HOST_URL = import.meta.env.VITE_API_URL || import.meta.env.REACT_APP_API_URL || 'http://localhost:8000';
+const HOST_URL = import.meta.env.VITE_API_URL || import.meta.env.REACT_APP_API_URL || 'https://agentic-backend-lyx3.onrender.com';
 // Ensure API_BASE always includes the path correctly
 const API_BASE = HOST_URL.endsWith('/') 
   ? `${HOST_URL}api/sensors` 

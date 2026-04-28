@@ -48,7 +48,7 @@ if (!document.head.querySelector('style[data-pulse]')) {
   document.head.appendChild(styleSheet);
 }
 
-const API_URL = import.meta.env.VITE_API_URL || import.meta.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || import.meta.env.REACT_APP_API_URL || 'https://agentic-backend-lyx3.onrender.com';
 
 export default function Dashboard() {
   const { t } = useLanguage();
@@ -106,7 +106,7 @@ export default function Dashboard() {
     // Fetch sensor data for live display and system inferences
     const fetchSensorData = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/sensors/latest/WS01");
+        const response = await fetch("https://agentic-backend-lyx3.onrender.com/api/sensors/latest/WS01");
         if (response.ok) {
           const data = await response.json();
           console.log(' Sensor API Response:', data);

@@ -36,7 +36,7 @@ export default function Advisor() {
 
   const fetchSensorData = async () => {
     try {
-      const r = await fetch("http://localhost:8000/api/sensors/latest/WS01");
+      const r = await fetch("https://agentic-backend-lyx3.onrender.com/api/sensors/latest/WS01");
       if (r.ok) {
         const d = await r.json();
         setSensorOnline(true);
@@ -60,7 +60,7 @@ export default function Advisor() {
   const fetchAIOverview = async () => {
     setIsLoading(true);
     try {
-      const r = await fetch("http://localhost:8000/api/advisor/insights", {
+      const r = await fetch("https://agentic-backend-lyx3.onrender.com/api/advisor/insights", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ category: "overview" }),

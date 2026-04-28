@@ -63,7 +63,7 @@ export function SmartVoiceForm({ title, description, endpoint, onDataExtracted, 
       const formData = new FormData();
       formData.append("audio", new File([audioBlob], "recording.webm", { type: "audio/webm" }));
       
-      const response = await fetch(`http://localhost:8000/api/voice/process`, {
+      const response = await fetch(`https://agentic-backend-lyx3.onrender.com/api/voice/process`, {
         method: "POST",
         body: formData,
       });

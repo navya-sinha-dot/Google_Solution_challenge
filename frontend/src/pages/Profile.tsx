@@ -105,7 +105,7 @@ export default function Profile() {
       try {
         const phone = localStorage.getItem("user_phone");
         if (!phone) { setSchemesLoading(false); return; }
-        const response = await fetch(`http://localhost:8000/api/profile?phone=${encodeURIComponent(phone)}`);
+        const response = await fetch(`https://agentic-backend-lyx3.onrender.com/api/profile?phone=${encodeURIComponent(phone)}`);
         const data = await response.json();
         if (data.status === "success" && data.profile && data.profile.name) {
           const p = data.profile;
@@ -143,7 +143,7 @@ export default function Profile() {
       const timeout = setTimeout(() => controller.abort(), 8000);
 
       const response = await fetch(
-        `http://localhost:8000/api/schemes/recommendations?${params.toString()}`,
+        `https://agentic-backend-lyx3.onrender.com/api/schemes/recommendations?${params.toString()}`,
         { signal: controller.signal }
       );
       clearTimeout(timeout);
@@ -197,7 +197,7 @@ export default function Profile() {
 
     // Persist to backend
     try {
-      await fetch("http://localhost:8000/api/profile/save", {
+      await fetch("https://agentic-backend-lyx3.onrender.com/api/profile/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: editForm.name, phone, land_size_acres: editForm.land_size_acres, location: editForm.location, crops: cropsArr }),

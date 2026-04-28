@@ -59,7 +59,7 @@ export function WeatherInsightPanel() {
       const weatherData = await getCurrentWeatherData();
       setWeatherData(weatherData);
 
-      const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      const backendUrl = import.meta.env.VITE_API_BASE_URL || 'https://agentic-backend-lyx3.onrender.com';
 
       const response = await fetch(`${backendUrl}/api/weather-insight`, {
         method: 'POST',

@@ -34,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const sendOtp = useCallback(async (phone: string, isSignup: boolean = false): Promise<{ success: boolean; message?: string }> => {
     try {
-      const response = await fetch("http://localhost:8000/api/auth/send-otp", {
+      const response = await fetch("https://agentic-backend-lyx3.onrender.com/api/auth/send-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, is_signup: isSignup }),
@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (phone: string, otp: string): Promise<boolean> => {
     try {
-      const response = await fetch("http://localhost:8000/api/auth/verify-otp", {
+      const response = await fetch("https://agentic-backend-lyx3.onrender.com/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, otp }),

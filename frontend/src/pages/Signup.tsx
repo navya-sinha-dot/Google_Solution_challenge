@@ -98,7 +98,7 @@ export default function Signup() {
         try {
             await new Promise((resolve) => setTimeout(resolve, 800));
             try {
-                await fetch('http://localhost:8000/api/profile/save', {
+                await fetch('https://agentic-backend-lyx3.onrender.com/api/profile/save', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

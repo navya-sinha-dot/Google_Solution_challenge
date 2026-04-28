@@ -9,7 +9,7 @@ import {
   Wheat, Loader2, Filter
 } from 'lucide-react';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = 'https://agentic-backend-lyx3.onrender.com';
 
 interface MandiRate {
   state: string;

@@ -349,7 +349,7 @@ export default function AIHardwareAccelerator() {
 
   const fetchHardwareStatus = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/fpga/status");
+      const response = await fetch("https://agentic-backend-lyx3.onrender.com/api/fpga/status");
       if (response.ok) {
         const data = await response.json();
         setHardwareStatus({
@@ -370,7 +370,7 @@ export default function AIHardwareAccelerator() {
   const fetchSensorData = async () => {
     try {
       const response = await fetch(
-        "http://localhost:8000/api/sensors/latest/WS01"
+        "https://agentic-backend-lyx3.onrender.com/api/sensors/latest/WS01"
       );
       if (response.ok) {
         const data = await response.json();
@@ -402,7 +402,7 @@ export default function AIHardwareAccelerator() {
     setLoadingRain(true);
     try {
       const response = await fetch(
-        "http://localhost:8000/api/fpga/rain-predict",
+        "https://agentic-backend-lyx3.onrender.com/api/fpga/rain-predict",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -446,7 +446,7 @@ export default function AIHardwareAccelerator() {
   const runSensorFusion = async () => {
     setLoadingFusion(true);
     try {
-      const response = await fetch("http://localhost:8000/api/fpga/fusion", {
+      const response = await fetch("https://agentic-backend-lyx3.onrender.com/api/fpga/fusion", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -487,7 +487,7 @@ export default function AIHardwareAccelerator() {
     setLoadingCombined(true);
     try {
       const response = await fetch(
-        "http://localhost:8000/api/fpga/combined-analysis",
+        "https://agentic-backend-lyx3.onrender.com/api/fpga/combined-analysis",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

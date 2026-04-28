@@ -17,7 +17,7 @@ export default function Marketplace() {
 
   const handleSearch = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/marketplace/match", {
+      const response = await fetch("https://agentic-backend-lyx3.onrender.com/api/marketplace/match", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ need_type: needType, location })
