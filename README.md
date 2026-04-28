@@ -1,6 +1,6 @@
 #  Agentic — FPGA-Accelerated Smart Agriculture System
 
-An intelligent, agentic agricultural monitoring and advisory system that combines **Zynq-7000 FPGA hardware acceleration**, **Groq LLM inference**, **real-time sensor fusion**, and **WhatsApp-based farmer Q&A** — all served through a modern React dashboard and FastAPI backend.
+An intelligent, agentic agricultural monitoring and advisory system that combines **Zynq-7000 FPGA hardware acceleration**, **Gemini LLM inference**, **real-time sensor fusion**, and **WhatsApp-based farmer Q&A** — all served through a modern React dashboard and FastAPI backend.
 
 ---
 
@@ -8,7 +8,7 @@ An intelligent, agentic agricultural monitoring and advisory system that combine
 
 - **FPGA-Accelerated Sensor Fusion** — ZC706 Zynq-7000 FPGA processes soil moisture, temperature, humidity, and light data via custom HLS/RTL IP cores
 - **FPGA Rain Prediction** — Hardware-accelerated rainfall prediction using temperature, humidity, pressure, and wind speed
-- **LLM-Powered Farm Advisor** — Groq-hosted LLaMA-3 provides contextual farming recommendations based on live sensor data
+- **LLM-Powered Farm Advisor** — Gemini-hosted LLaMA-3 provides contextual farming recommendations based on live sensor data
 - **WhatsApp Q&A** — Farmers can ask questions via WhatsApp (Twilio) and receive AI-driven, sensor-backed answers
 - **Real-Time Dashboard** — React + TypeScript frontend with live sensor readings, FPGA status, AI advisor, and weather insights
 - **MQTT Sensor Ingestion** — ESP32/LoRa sensor data streamed via MQTT and stored in SQLite
@@ -76,7 +76,7 @@ agentic/
 |-------|-----------|
 | **Backend** | Python, FastAPI, Uvicorn |
 | **Frontend** | React, TypeScript, Vite, Tailwind CSS, shadcn/ui |
-| **LLM** | Groq (LLaMA-3), LangChain, LangGraph |
+| **LLM** | Gemini, LangChain, LangGraph |
 | **FPGA** | Xilinx Zynq-7000 (ZC706), Vivado HLS, Verilog |
 | **Database** | SQLite (dev), PostgreSQL (prod) |
 | **Messaging** | Twilio WhatsApp Business API |
@@ -90,7 +90,7 @@ agentic/
 
 - **Python 3.10+**
 - **Node.js 18+** and **npm**
-- **Groq API Key** — [Get free key](https://console.groq.com/keys)
+- **Gemini API Key** — [Get free key](https://console.Gemini.com/keys)
 - *(Optional)* Xilinx ZC706 FPGA board connected via UART (COM4)
 - *(Optional)* Twilio account for WhatsApp integration
 
@@ -112,8 +112,8 @@ Edit the `.env` file in the project root:
 # Database
 DATABASE_URL=sqlite:///C:/path/to/agentic/sensor_data.db
 
-# Groq LLM
-GROQ_API_KEY=gsk_your_api_key_here
+# Gemini LLM
+Gemini_API_KEY=gsk_your_api_key_here
 
 # FPGA (set to false if no hardware)
 FPGA_ENABLED=true
@@ -241,7 +241,7 @@ ESP32 + LoRa Sensors
    ├── FPGA Bridge (UART) ◄──► ZC706 FPGA
    │   ├── Sensor Fusion IP
    │   └── Rain Predictor IP
-   ├── Groq LLM (LangChain/LangGraph)
+   ├── Gemini LLM (LangChain/LangGraph)
    │   ├── Farm Advisor Agent
    │   ├── Weather Workflow
    │   └── Agricultural QA
