@@ -9,7 +9,7 @@ import {
   Wheat, Loader2, Filter
 } from 'lucide-react';
 
-const API_URL = 'https://agentic-backend-lyx3.onrender.com';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 interface MandiRate {
   state: string;

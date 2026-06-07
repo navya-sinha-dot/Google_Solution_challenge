@@ -19,6 +19,7 @@ import Advisor from "./pages/Advisor";
 import SystemOverview from "./pages/SystemOverview";
 import AIHardwareAccelerator from "./pages/AIHardwareAccelerator";
 import MandiRates from "./pages/MandiRates";
+import DatabaseExplorer from "./pages/DatabaseExplorer";
 import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
 import HardwareSetup from "./pages/HardwareSetup";
@@ -26,7 +27,17 @@ import BuyHardware from "./pages/BuyHardware";
 
 import { ThemeProvider } from "next-themes";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // ── Global caching defaults ──────────────────────────────────────
+      staleTime:            30_000,    // data fresh for 30 s — no refetch needed
+      gcTime:               5 * 60_000, // keep in memory 5 min after component unmounts
+      refetchOnWindowFocus: false,     // stop hammering the API on tab switch
+      retry:                1,         // 1 retry on failure
+    },
+  },
+});
 
 // Redirect authenticated users away from login
 // If authenticated but no hardware, send them to hardware setup first
@@ -144,6 +155,16 @@ const AppContent = () => {
             <ProtectedRoute>
               <HardwareGate>
                 <MandiRates />
+              </HardwareGate>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/db"
+          element={
+            <ProtectedRoute>
+              <HardwareGate>
+                <DatabaseExplorer />
               </HardwareGate>
             </ProtectedRoute>
           }

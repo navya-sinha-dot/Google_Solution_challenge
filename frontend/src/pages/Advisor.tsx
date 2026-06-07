@@ -5,6 +5,8 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { Droplets, Sprout, Wind, Thermometer, Leaf, Loader2, Sparkles, RefreshCw, CheckCircle2 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
+const API_URL = import.meta.env.VITE_API_URL || '';
+
 export default function Advisor() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -36,7 +38,7 @@ export default function Advisor() {
 
   const fetchSensorData = async () => {
     try {
-      const r = await fetch("https://agentic-backend-lyx3.onrender.com/api/sensors/latest/WS01");
+      const r = await fetch(`${API_URL}/api/sensors/latest/WS01`);
       if (r.ok) {
         const d = await r.json();
         setSensorOnline(true);
@@ -60,7 +62,7 @@ export default function Advisor() {
   const fetchAIOverview = async () => {
     setIsLoading(true);
     try {
-      const r = await fetch("https://agentic-backend-lyx3.onrender.com/api/advisor/insights", {
+      const r = await fetch(`${API_URL}/api/advisor/insights`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ category: "overview" }),

@@ -2,7 +2,6 @@ import { ReactNode } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTheme } from 'next-themes';
 import { ParameterStatus } from '@/lib/weatherData';
-import { cn } from '@/lib/utils';
 
 interface ParameterCardProps {
   icon: ReactNode;
@@ -13,128 +12,106 @@ interface ParameterCardProps {
   colorClass?: string;
 }
 
+const PRIMARY = '#10B981';
+
+const STATUS_CONFIG: Record<ParameterStatus, { label: string; color: string; bg: string }> = {
+  normal:   { label: 'Normal',   color: PRIMARY,    bg: 'rgba(16,185,129,0.12)' },
+  elevated: { label: 'Elevated', color: '#F59E0B',  bg: 'rgba(245,158,11,0.12)' },
+  critical: { label: 'Critical', color: '#EF4444',  bg: 'rgba(239,68,68,0.12)'  },
+};
+
 export function ParameterCard({
   icon,
   labelKey,
   value,
   unit,
   status = 'normal',
-  colorClass = 'text-blue-500', // Default if not provided
+  colorClass = '',
 }: ParameterCardProps) {
   const { t } = useLanguage();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
+  const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.normal;
+
   return (
     <div
       style={{
-        background: isDark ? '#1E1E1E' : '#FFFFFF',
+        background: isDark ? 'rgba(255,255,255,0.04)' : '#fff',
         borderRadius: '16px',
-        padding: '16px 20px',
-        border: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0,0,0,0.03)',
-        boxShadow: isDark ? '0 4px 12px rgba(0,0,0,0.2)' : '0 4px 12px rgba(0,0,0,0.03)',
-        transition: 'all 0.3s ease',
+        padding: '14px 16px',
+        border: isDark ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(0,0,0,0.06)',
+        boxShadow: isDark ? 'none' : '0 2px 12px rgba(0,0,0,0.04)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        transition: 'box-shadow 0.2s',
+        cursor: 'default',
       }}
-      className="group hover:shadow-md"
+      onMouseEnter={e => { if (!isDark) (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 20px rgba(0,0,0,0.08)'; }}
+      onMouseLeave={e => { if (!isDark) (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 12px rgba(0,0,0,0.04)'; }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        {/* Icon Circle */}
-        <div
-          style={{
-            width: '48px',
-            height: '48px',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: isDark ? 'rgba(255,255,255,0.05)' : '#F0F9FF',
-          }}
-          className={cn(colorClass)}
-        >
-          <div>
-            {icon}
-          </div>
-        </div>
-
-        {/* Content Wrapper */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          {/* Top row: Label & Badge */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '4px', marginBottom: '6px' }}>
-            <span
-              style={{
-                fontSize: '14px',
-                fontWeight: 500,
-                color: isDark ? '#9CA3AF' : '#4B5563',
-              }}
-            >
-              {t(labelKey)}
-            </span>
-            <StatusPill status={status} />
-          </div>
-
-          {/* Bottom row: Value & Unit */}
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-            <span
-              style={{
-                fontSize: '28px',
-                fontWeight: 700,
-                color: isDark ? '#F9FAFB' : '#111827',
-                letterSpacing: '-0.5px',
-                lineHeight: 1,
-              }}
-            >
-              {value}
-            </span>
-            <span
-              style={{
-                fontSize: '20px',
-                fontWeight: 600,
-                color: isDark ? '#E5E7EB' : '#111827',
-              }}
-            >
-              {unit}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StatusPill({ status }: { status: ParameterStatus }) {
-  const { t } = useLanguage();
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
-
-  const getStyle = () => {
-    switch (status) {
-      case 'normal':
-        return { bg: isDark ? 'rgba(16, 185, 129, 0.15)' : '#DCFCE7', text: isDark ? '#34D399' : '#166534' };
-      case 'elevated':
-        return { bg: isDark ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7', text: isDark ? '#FBBF24' : '#92400E' };
-      case 'critical':
-        return { bg: isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2', text: isDark ? '#F87171' : '#991B1B' };
-      default:
-        return { bg: isDark ? 'rgba(255,255,255,0.1)' : '#F3F4F6', text: isDark ? '#D1D5DB' : '#374151' };
-    }
-  };
-
-  const style = getStyle();
-
-  return (
-    <span
-      style={{
-        background: style.bg,
-        color: style.text,
-        padding: '2px 10px',
+      {/* Icon bubble */}
+      <div style={{
+        width: '42px',
+        height: '42px',
         borderRadius: '12px',
-        fontSize: '11px',
-        fontWeight: 600,
+        background: cfg.bg,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        color: cfg.color,
+      }}>
+        {icon}
+      </div>
+
+      {/* Label + value */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{
+          margin: 0,
+          fontSize: '11px',
+          fontWeight: 600,
+          color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.4)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}>
+          {t(labelKey)}
+        </p>
+        <p style={{
+          margin: '2px 0 0',
+          fontSize: '22px',
+          fontWeight: 700,
+          color: isDark ? '#fff' : '#0f172a',
+          letterSpacing: '-0.5px',
+          lineHeight: 1,
+          whiteSpace: 'nowrap',
+        }}>
+          {value}
+          <span style={{ fontSize: '13px', fontWeight: 500, color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)', marginLeft: '3px' }}>
+            {unit}
+          </span>
+        </p>
+      </div>
+
+      {/* Status pill */}
+      <span style={{
+        flexShrink: 0,
+        padding: '3px 9px',
+        borderRadius: '20px',
+        fontSize: '10px',
+        fontWeight: 700,
         textTransform: 'uppercase',
-        letterSpacing: '0.5px',
-      }}
-    >
-      {t(status)}
-    </span>
+        letterSpacing: '0.4px',
+        color: cfg.color,
+        background: cfg.bg,
+        whiteSpace: 'nowrap',
+      }}>
+        {cfg.label}
+      </span>
+    </div>
   );
 }

@@ -1,261 +1,301 @@
-#  Agentic — FPGA-Accelerated Smart Agriculture System
+# 🌾 SkyView — Smart Agriculture Platform
 
-An intelligent, agentic agricultural monitoring and advisory system that combines **Zynq-7000 FPGA hardware acceleration**, **Gemini LLM inference**, **real-time sensor fusion**, and **WhatsApp-based farmer Q&A** — all served through a modern React dashboard and FastAPI backend.
+An end-to-end intelligent agriculture system for Indian farmers, combining real-time IoT sensing, multi-agent AI, FPGA hardware acceleration, and a multilingual React dashboard with voice interaction.
 
----
-
-##  Features
-
-- **FPGA-Accelerated Sensor Fusion** — ZC706 Zynq-7000 FPGA processes soil moisture, temperature, humidity, and light data via custom HLS/RTL IP cores
-- **FPGA Rain Prediction** — Hardware-accelerated rainfall prediction using temperature, humidity, pressure, and wind speed
-- **LLM-Powered Farm Advisor** — Gemini-hosted LLaMA-3 provides contextual farming recommendations based on live sensor data
-- **WhatsApp Q&A** — Farmers can ask questions via WhatsApp (Twilio) and receive AI-driven, sensor-backed answers
-- **Real-Time Dashboard** — React + TypeScript frontend with live sensor readings, FPGA status, AI advisor, and weather insights
-- **MQTT Sensor Ingestion** — ESP32/LoRa sensor data streamed via MQTT and stored in SQLite
-- **Autonomous Alerts** — Configurable alerts via Twilio WhatsApp with cooldown and deduplication
+Built for **Google Solution Challenge**.
 
 ---
 
-##  Project Structure
+## What It Does
 
-```
-agentic/
-├── app.py                      # FastAPI backend — all API endpoints
-├── agricultural_qa.py          # Agricultural Q&A module (LLM + sensor context)
-├── fpga_dual_bridge.py         # FPGA UART bridge (ZC706 dual accelerator)
-├── unified_zc706_bridge.py     # Unified ZC706 bridge implementation
-├── decision_engine_dual.py     # Dual decision engine logic
-├── llm_accelerator_agent.py    # LLM accelerator agent
-├── weather_workflow_llm_first.py # Weather workflow (LLM-first approach)
-├── tools.py                    # Tool functions for LangGraph agents
-├── sensor_endpoints.py         # Sensor data API endpoints
-├── sensor_models.py            # Pydantic sensor data models
-├── mqtt_sensor_simulator.py    # MQTT sensor data simulator
-├── mqtt_monitor.py             # MQTT broker monitor
-├── esp32_mqtt_simulator.py     # ESP32 MQTT simulator
-├── esp32_sensor_simulator.py   # ESP32 sensor simulator
-├── send_sensor_data.py         # Sensor data sender utility
-├── init_db.py                  # Database initialization (PostgreSQL)
-├── init_db_sqlite.py           # Database initialization (SQLite)
-├── schema_sqlite.sql           # SQLite database schema
-├── requirements.txt            # Python dependencies
-├── .env                        # Environment configuration
-│
-├── frontend/                   # React + TypeScript dashboard (Vite)
-│   ├── src/
-│   │   ├── pages/              # Dashboard, Advisor, Accelerator pages
-│   │   ├── components/         # UI components (panels, charts, maps)
-│   │   ├── hooks/              # Custom React hooks
-│   │   └── lib/                # Utility libraries
-│   ├── package.json
-│   └── vite.config.ts
-│
-├── hls/                        # Vivado HLS source files
-│   ├── sensor_fusion.cpp       # Sensor fusion HLS implementation
-│   ├── sensor_fusion.h         # Sensor fusion header
-│   ├── sensor_fusion_tb.cpp    # HLS testbench
-│   └── rain_predictor/         # Rain predictor HLS
-│
-├── rtl/                        # Verilog RTL source files
-│   ├── sensor_fusion.v         # Sensor fusion RTL
-│   ├── sensor_fusion_axi.v     # AXI-wrapped sensor fusion
-│   ├── rain_predictor.v        # Rain predictor RTL
-│   ├── rain_predictor_axi.v    # AXI-wrapped rain predictor
-│   └── sensor_fusion_pkg.vh    # RTL package definitions
-│
-└── ip_repo/                    # Vivado IP repository
-    ├── component.xml           # IP-XACT component descriptor
-    └── src/                    # IP core sources
-```
+- **Live weather station** — ESP32 sensors (temperature, humidity, soil moisture, UV, PM2.5) transmit via LoRa to a Raspberry Pi gateway, ingested into PostgreSQL in real time
+- **AI farm advisor** — multi-agent system powered by Groq (Llama 3.1) gives crop recommendations, irrigation schedules, pest alerts, and soil analysis based on live sensor data
+- **Mandi rates** — live commodity prices from data.gov.in with 30-minute caching, MSP history, and buyer matching
+- **Voice interaction** — farmers can call in via Vapi.ai or WhatsApp (Twilio) and get AI responses in Hindi/regional languages via Sarvam AI TTS
+- **FPGA acceleration** — Xilinx ZC706 board runs HLS-synthesized sensor fusion and rain prediction; falls back to software simulation when hardware isn't connected
+- **Government schemes** — AI-curated scheme recommendations based on farmer profile (land size, location, crops)
 
 ---
 
-##  Tech Stack
+## Quick Start
 
-| Layer | Technology |
-|-------|-----------|
-| **Backend** | Python, FastAPI, Uvicorn |
-| **Frontend** | React, TypeScript, Vite, Tailwind CSS, shadcn/ui |
-| **LLM** | Gemini, LangChain, LangGraph |
-| **FPGA** | Xilinx Zynq-7000 (ZC706), Vivado HLS, Verilog |
-| **Database** | SQLite (dev), PostgreSQL (prod) |
-| **Messaging** | Twilio WhatsApp Business API |
-| **IoT** | ESP32, MQTT |
-
----
-
-##  Getting Started
-
-### Prerequisites
-
-- **Python 3.10+**
-- **Node.js 18+** and **npm**
-- **Gemini API Key** — [Get free key](https://console.Gemini.com/keys)
-- *(Optional)* Xilinx ZC706 FPGA board connected via UART (COM4)
-- *(Optional)* Twilio account for WhatsApp integration
-
-### 1. Clone & Install Backend
+### Docker (recommended)
 
 ```bash
-git clone https://github.com/your-repo/agentic.git
-cd agentic
+cp .env.example .env
+# Fill in your API keys in .env (at minimum: GROQ_API_KEYS)
 
-# Install Python dependencies
-pip install -r requirements.txt
+docker compose up --build
 ```
 
-### 2. Configure Environment
+- API: http://localhost:8000
+- Docs: http://localhost:8000/docs
+- Admin: http://localhost:8000/admin/tables
+- DB Explorer UI: http://localhost:5173/db
 
-Edit the `.env` file in the project root:
-
-```env
-# Database
-DATABASE_URL=sqlite:///C:/path/to/agentic/sensor_data.db
-
-# Gemini LLM
-Gemini_API_KEY=gsk_your_api_key_here
-
-# FPGA (set to false if no hardware)
-FPGA_ENABLED=true
-FPGA_PORT=COM4
-
-# Twilio WhatsApp (optional)
-TWILIO_ACCOUNT_SID=your_sid
-TWILIO_AUTH_TOKEN=your_token
-TWILIO_WHATSAPP_NUMBER=+14155238886
-TWILIO_ALERT_RECIPIENT=+91xxxxxxxxxx
-
-# Server
-PORT=8000
-```
-
-### 3. Initialize Database
+### Local (Linux / macOS)
 
 ```bash
-python init_db_sqlite.py
+cp .env.example .env
+# Edit .env
+
+chmod +x run.sh
+./run.sh
 ```
 
-### 4. Start Backend
+### Frontend (separate terminal)
 
 ```bash
-python app.py
-```
-
-The API server starts at `http://localhost:8000`.
-
-### 5. Start Frontend
-
-```bash
-cd frontend
+cp .env.example .env.local   # frontend env
 npm install
 npm run dev
 ```
 
-The dashboard opens at `http://localhost:5173`.
+Frontend: http://localhost:5173
+
+> **Note:** In dev mode, Vite proxies all `/api` requests to `localhost:8000` automatically. No `VITE_API_URL` needed locally.
 
 ---
 
-##  API Endpoints
+## Project Structure
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/` | System status |
-| `GET` | `/health` | Health check |
-| `GET` | `/api/sensor/latest/{station_id}` | Latest sensor readings |
-| `POST` | `/api/sensor/lora` | Receive LoRa sensor data |
-| `POST` | `/api/fpga/sensor-fusion` | FPGA sensor fusion |
-| `POST` | `/api/fpga/rain-predict` | FPGA rain prediction |
-| `POST` | `/api/fpga/combined-analysis` | Combined FPGA analysis |
-| `GET` | `/api/fpga/status` | FPGA accelerator status |
-| `POST` | `/api/advisor/insights` | AI farming advisor |
-| `POST` | `/api/weather/insight` | Weather insight (LLM) |
-| `POST` | `/api/chat` | General chat endpoint |
-| `POST` | `/api/agricultural-qa` | Agricultural Q&A |
-| `POST` | `/webhook/whatsapp` | WhatsApp webhook |
-| `POST` | `/webhook/whatsapp/farm-qa` | WhatsApp farm Q&A |
+```
+.
+├── skyview/                    # Python backend package
+│   ├── main.py                 # FastAPI app + router registration
+│   ├── api/                    # Route handlers (one file per domain)
+│   │   ├── core_routes.py      # GET /, /health, /api/llm-pool
+│   │   ├── sensor_routes.py    # Sensor ingest + history
+│   │   ├── auth_routes.py      # OTP login / signup
+│   │   ├── chat_routes.py      # AI chat + weather insight + farm Q&A
+│   │   ├── advisor_routes.py   # Category-based AI insights
+│   │   ├── mandi_routes.py     # Live commodity prices
+│   │   ├── profile_routes.py   # Farmer profile + govt schemes
+│   │   ├── marketplace_routes.py # Buyer/seller matching
+│   │   ├── voice_routes.py     # Vapi + Sarvam TTS + translation
+│   │   ├── fpga_routes.py      # Hardware accelerator endpoints
+│   │   └── webhook_routes.py   # Twilio WhatsApp webhooks
+│   ├── agents/                 # AI agents
+│   │   ├── supervisor.py       # Multi-agent orchestrator
+│   │   ├── mandi_agent.py      # Live price fetcher + cache
+│   │   ├── fpga_agent.py       # FPGA software simulation
+│   │   └── agricultural_qa.py  # Crop Q&A engine
+│   ├── admin/
+│   │   └── admin_routes.py     # DB browser + analytics
+│   ├── data/                   # Database layer
+│   │   ├── db.py               # Engine + session factory
+│   │   ├── schema.py           # Table creation (IF NOT EXISTS)
+│   │   ├── queries.py          # Reusable query helpers
+│   │   ├── seed.py             # Full seed data
+│   │   └── seed_fast.py        # Quick seed for dev/CI
+│   └── utils/
+│       ├── config.py           # All env vars (Settings class)
+│       ├── llm_pool.py         # Round-robin Groq key balancer
+│       └── logger.py           # Structured logging
+│
+├── src/                        # React frontend
+│   ├── pages/                  # Route-level page components
+│   ├── components/             # Shared UI components
+│   ├── context/
+│   │   ├── AuthContext.tsx      # OTP auth state
+│   │   └── LanguageContext.tsx  # i18n (en/hi/te/...)
+│   └── lib/
+│       └── weatherData.ts      # Backend data fetching + mapping
+│
+├── hardware/                   # FPGA hardware design
+│   ├── sensor_fusion.cpp       # HLS sensor fusion (C++)
+│   ├── rain_predictor.cpp      # HLS rain prediction (C++)
+│   ├── sensor_fusion.v         # RTL (Verilog)
+│   └── sensor_fusion_axi.v     # AXI4-Lite interface
+│
+├── tests/                      # pytest test suite
+│   ├── conftest.py             # Fixtures (TestClient + SQLite DB)
+│   ├── test_api.py             # All API endpoint tests
+│   └── test_ingestion.py       # Sensor ingestion pipeline tests
+│
+├── infra/                      # Infrastructure
+│   ├── Dockerfile.backend      # Python 3.11 + uvicorn
+│   ├── Dockerfile.frontend     # Node 20 build + nginx serve
+│   ├── requirements.txt        # Python dependencies (pinned)
+│   ├── mosquitto.conf          # MQTT broker config
+│   └── nginx.conf              # Reverse proxy + SPA fallback
+│
+├── docker-compose.yml          # db + mqtt + backend services
+├── run.sh                      # Local dev runner
+├── .env.example                # All environment variables
+└── test_all_routes.py          # End-to-end smoke tests (live server)
+```
 
 ---
 
-##  WhatsApp Integration
+## API Reference
 
-1. Create a [Twilio](https://www.twilio.com/) account and enable WhatsApp
-2. Add your Twilio credentials to `.env`
-3. Set webhook URL in Twilio Console to: `https://your-domain.com/webhook/whatsapp/farm-qa`
-4. Farmers can message questions like:
-   - *"How is my soil moisture?"*
-   - *"Should I irrigate today?"*
-   - *"Will it rain?"*
-   - *"Why is my plant stressed?"*
+All routes are documented interactively at `/docs` (Swagger UI) when the server is running.
+
+| Domain | Method | Path | Description |
+|--------|--------|------|-------------|
+| System | GET | `/` | Service info |
+| System | GET | `/health` | DB + LLM pool health |
+| Sensors | POST | `/api/sensors/data` | Ingest sensor reading (hardware or flat JSON) |
+| Sensors | GET | `/api/sensors/latest/{id}` | Latest reading for a station |
+| Sensors | GET | `/api/sensors/history/{id}` | Historical readings (`?hours=24&limit=200`) |
+| Sensors | GET | `/api/sensors/stations` | List all registered stations |
+| Sensors | POST | `/api/sensors/trends/store` | Store trends snapshot |
+| Auth | POST | `/api/auth/send-otp` | Send OTP (returns OTP in dev mode) |
+| Auth | POST | `/api/auth/verify-otp` | Verify OTP → token |
+| Auth | POST | `/api/auth/signup` | Register new farmer |
+| Chat | POST | `/api/chat` | Multi-agent conversational AI |
+| Chat | POST | `/api/weather-insight` | Weather-based farm advice |
+| Chat | POST | `/api/agriculture/qa` | Structured crop Q&A |
+| Advisor | POST | `/api/advisor/insights` | AI insights by category |
+| Mandi | GET | `/api/mandi/rates` | Live commodity prices (`?state=&commodity=`) |
+| Mandi | GET | `/api/mandi/commodities` | Known commodity list |
+| Mandi | GET | `/api/mandi/history` | Historical mandi data |
+| Mandi | GET | `/api/mandi/msp` | Minimum support prices |
+| Profile | GET | `/api/profile` | Fetch farmer profile (`?phone=`) |
+| Profile | POST | `/api/profile/save` | Create / update profile |
+| Schemes | GET | `/api/schemes` | Full government scheme catalog |
+| Schemes | GET | `/api/schemes/recommendations` | AI govt scheme recommendations |
+| Marketplace | POST | `/api/marketplace/match` | Find buyers for produce |
+| Voice | POST | `/api/vapi/call` | Trigger outbound voice call |
+| Voice | POST | `/api/speech/synthesize` | Text → speech (Sarvam AI) |
+| Voice | POST | `/api/translate` | Translate texts to target language |
+| Voice | POST | `/api/profile/voice-update` | Update profile from voice transcript |
+| FPGA | GET | `/api/fpga/status` | Hardware accelerator status |
+| FPGA | POST | `/api/fpga/fusion` | Sensor fusion computation |
+| FPGA | POST | `/api/fpga/rain-predict` | Rain probability prediction |
+| FPGA | POST | `/api/fpga/combined-analysis` | Full combined analysis |
+| Webhooks | GET | `/webhook/whatsapp` | Twilio verification handshake |
+| Webhooks | POST | `/webhook/whatsapp` | Inbound WhatsApp message handler |
+| Admin | GET | `/admin/tables` | List all DB tables |
+| Admin | GET | `/admin/tables/{table}` | Browse table data (paginated) |
+| Admin | GET | `/admin/analytics/overview` | System-wide stats |
 
 ---
 
-##  FPGA Hardware Setup
+## Environment Variables
 
-The system uses a **Xilinx ZC706 (Zynq-7000)** board with two custom accelerators:
+Copy `.env.example` to `.env` and fill in:
 
-1. **Sensor Fusion Accelerator** — Fuses soil, temperature, humidity, and light data into actionable crop health scores
-2. **Rain Predictor Accelerator** — Predicts rainfall probability from environmental inputs
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | Recommended | PostgreSQL connection string. Falls back to SQLite if unset. |
+| `GROQ_API_KEYS` | Yes (AI features) | Comma-separated Groq API keys for load balancing |
+| `DATAGOV_API_KEY` | Yes (live mandi) | data.gov.in API key (free registration) |
+| `VAPI_AI_API_KEY` | Optional | Vapi.ai key for outbound voice calls |
+| `VAPI_ASSISTANT_ID` | Optional | Vapi assistant ID |
+| `SARVAM_AI_API_KEY` | Optional | Sarvam AI key for Indian language TTS + translation |
+| `TWILIO_ACCOUNT_SID` | Optional | Twilio SID for WhatsApp integration |
+| `TWILIO_AUTH_TOKEN` | Optional | Twilio auth token |
+| `TWILIO_WHATSAPP_NUMBER` | Optional | Twilio WhatsApp sender number |
+| `ENABLE_FPGA` | No | `True` only when ZC706 board is physically connected |
+| `FPGA_PORT` | No | Serial port for FPGA bridge (`/dev/ttyUSB0` or `COM4`) |
+| `MQTT_BROKER` | No | MQTT broker host (default: `localhost`) |
+| `STATION_ID` | No | Default station ID (default: `WS01`) |
 
-### Connection
-- Board connected via **UART** (default: `COM4`)
-- Set `FPGA_ENABLED=true` in `.env`
-- If no hardware is available, the system falls back to a software mock automatically
+---
 
-### Building IP Cores (Vivado)
+## Running Tests
+
 ```bash
-cd hls
-make csim     # Run C simulation
-make synth    # Run HLS synthesis
+# Unit tests (no live server needed — uses TestClient + SQLite)
+pip install -r infra/requirements.txt
+pytest tests/ -v
+
+# End-to-end smoke tests (requires live server on :8000)
+uvicorn skyview.main:app --port 8000 &
+python test_all_routes.py
 ```
 
 ---
 
-##  Running Sensor Simulators
+## Sending Sensor Data
 
-If you don't have physical ESP32 hardware, use the simulators:
+### From hardware (ESP32 → RPi → HTTP)
+
+```json
+POST /api/sensors/data
+{
+  "id": "WS01",
+  "ts": 1700000000,
+  "env": {"t": 28.5, "h": 65.0, "p": 1012.0},
+  "wind": {"s": 3.2, "d": "NE"},
+  "rain": 0.5,
+  "soil": {"t": 27.0, "m": 52.0},
+  "air": {"pm25": 55.0, "pm10": 110.0},
+  "rad": {"uv": 4.0, "lux": 35000.0},
+  "pwr": {"bat": 3.8, "sol": 5.1}
+}
+```
+
+### Flat format (scripts / testing)
+
+```json
+POST /api/sensors/data
+{
+  "station_id": "WS01",
+  "temperature": 28.5,
+  "humidity": 65.0,
+  "pressure": 1012.0,
+  "wind_speed": 3.2,
+  "wind_direction": "NE",
+  "rainfall": 0.5,
+  "soil_temperature": 27.0,
+  "soil_moisture": 52.0,
+  "pm25": 55.0,
+  "pm10": 110.0,
+  "uv_index": 4.0,
+  "lux": 35000.0,
+  "battery_voltage": 3.8,
+  "solar_voltage": 5.1
+}
+```
+
+---
+
+## Seeding the Database
 
 ```bash
-# MQTT sensor simulator (requires MQTT broker like Mosquitto)
-python mqtt_sensor_simulator.py
+# Full seed (mandi history, MSP data, sample stations + readings)
+python -m skyview.data.seed
 
-# ESP32 MQTT simulator
-python esp32_mqtt_simulator.py
-
-# Simple sensor data sender
-python send_sensor_data.py
+# Fast seed (minimal data, good for CI)
+python -m skyview.data.seed_fast
 ```
 
 ---
 
-##  Architecture
+## Adding a New Route
 
+1. Create `skyview/api/my_feature_routes.py`
+2. Define a `router = APIRouter(prefix="/api/my-feature", tags=["My Feature"])`
+3. Add your endpoints
+4. Register in `skyview/main.py`:
+
+```python
+_register("skyview.api.my_feature_routes")
 ```
-ESP32 + LoRa Sensors
-        │
-        ▼
-   MQTT Broker ──────► mqtt_monitor.py
-        │
-        ▼
-   FastAPI Backend (app.py)
-   ├── Sensor Endpoints
-   ├── FPGA Bridge (UART) ◄──► ZC706 FPGA
-   │   ├── Sensor Fusion IP
-   │   └── Rain Predictor IP
-   ├── Gemini LLM (LangChain/LangGraph)
-   │   ├── Farm Advisor Agent
-   │   ├── Weather Workflow
-   │   └── Agricultural QA
-   ├── Twilio WhatsApp Webhook
-   └── SQLite Database
-        │
-        ▼
-   React Dashboard (frontend/)
-   ├── Live Sensor Panels
-   ├── FPGA Accelerator View
-   ├── AI Farm Advisor
-   └── Weather Insights
-```
+
+5. Add tests in `tests/test_api.py`
 
 ---
 
-This project is developed for academic and research purposes.
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Backend | Python 3.11, FastAPI, SQLAlchemy 2.0 |
+| AI / LLM | Groq API (Llama 3.1-8b-instant), multi-key load balancing |
+| Database | PostgreSQL 16 (production), SQLite (dev fallback) |
+| IoT | ESP32, LoRa, MQTT (Eclipse Mosquitto) |
+| FPGA | Xilinx ZC706, Vivado HLS, Verilog RTL, AXI4-Lite |
+| Voice | Vapi.ai (calls), Sarvam AI (TTS + translation), Twilio (WhatsApp) |
+| Frontend | React 18, Vite, TypeScript, Tailwind CSS, Recharts |
+| Infrastructure | Docker, docker-compose, nginx, uvicorn |
+| Testing | pytest, FastAPI TestClient, httpx |
+
+---
+
+## License
+
+Google Solution Challenge project. MIT License.

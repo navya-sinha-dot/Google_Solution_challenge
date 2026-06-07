@@ -10,6 +10,8 @@ import { UserCircle, MapPin, LayoutGrid, Wheat, ShieldCheck, ExternalLink, Loade
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 
+const API_URL = import.meta.env.VITE_API_URL || '';
+
 const LOCAL_SCHEMES = [
   {
     scheme_name: "PM-Kisan Samman Nidhi",
@@ -105,7 +107,7 @@ export default function Profile() {
       try {
         const phone = localStorage.getItem("user_phone");
         if (!phone) { setSchemesLoading(false); return; }
-        const response = await fetch(`https://agentic-backend-lyx3.onrender.com/api/profile?phone=${encodeURIComponent(phone)}`);
+        const response = await fetch(`${API_URL}/api/profile?phone=${encodeURIComponent(phone)}`);
         const data = await response.json();
         if (data.status === "success" && data.profile && data.profile.name) {
           const p = data.profile;
@@ -134,16 +136,11 @@ export default function Profile() {
   const fetchSchemes = async (landSize: any, loc: any) => {
     setSchemesLoading(true);
     try {
-      const phone = localStorage.getItem("user_phone") || "123";
-      const params = new URLSearchParams({ phone: phone });
-      if (landSize) params.append("land_size", landSize);
-      if (loc) params.append("state", loc);
-
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 8000);
 
       const response = await fetch(
-        `https://agentic-backend-lyx3.onrender.com/api/schemes/recommendations?${params.toString()}`,
+        `${API_URL}/api/schemes`,
         { signal: controller.signal }
       );
       clearTimeout(timeout);
@@ -151,12 +148,29 @@ export default function Profile() {
       if (!response.ok) throw new Error("HTTP " + response.status);
 
       const data = await response.json();
-      // Filter out mandi price entries, keep only real government schemes
-      const govSchemes = Array.isArray(data)
-        ? data.filter((s: any) => !s.scheme_name?.startsWith("Today's Mandi Price") && !s.scheme_name?.startsWith("Live Mandi Price"))
-        : [];
+      const backendSchemes = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.schemes)
+          ? data.schemes
+          : [];
 
-      setSchemes(govSchemes.length > 0 ? govSchemes : LOCAL_SCHEMES);
+      const localDocsByScheme = new Map(
+        LOCAL_SCHEMES.map(item => [item.scheme_name.toLowerCase(), item.required_docs])
+      );
+
+      const normalized = backendSchemes
+        .filter((scheme: any) => scheme?.scheme_name)
+        .map((scheme: any) => ({
+          scheme_name: scheme.scheme_name,
+          description: scheme.benefit_description || scheme.description || "Government scheme details available.",
+          required_docs: Array.isArray(scheme.required_docs)
+            ? scheme.required_docs
+            : localDocsByScheme.get(String(scheme.scheme_name).toLowerCase()) || [],
+          link: scheme.official_url || scheme.link || "https://www.myscheme.gov.in/",
+          source: scheme.source || scheme.status || "Government Scheme",
+        }));
+
+      setSchemes(normalized.length > 0 ? normalized : LOCAL_SCHEMES);
     } catch {
       // Network error or timeout — fall back to local schemes silently
       setSchemes(LOCAL_SCHEMES);
@@ -197,7 +211,7 @@ export default function Profile() {
 
     // Persist to backend
     try {
-      await fetch("https://agentic-backend-lyx3.onrender.com/api/profile/save", {
+      await fetch(`${API_URL}/api/profile/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: editForm.name, phone, land_size_acres: editForm.land_size_acres, location: editForm.location, crops: cropsArr }),

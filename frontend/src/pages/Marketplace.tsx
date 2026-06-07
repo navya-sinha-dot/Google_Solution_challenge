@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Mic, Search, Tractor, Users, Wheat } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+const API_URL = import.meta.env.VITE_API_URL || '';
+
 export default function Marketplace() {
   const [needType, setNeedType] = useState("labor");
   const [location, setLocation] = useState("Punjab");
@@ -17,7 +19,7 @@ export default function Marketplace() {
 
   const handleSearch = async () => {
     try {
-      const response = await fetch("https://agentic-backend-lyx3.onrender.com/api/marketplace/match", {
+      const response = await fetch(`${API_URL}/api/marketplace/match`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ need_type: needType, location })

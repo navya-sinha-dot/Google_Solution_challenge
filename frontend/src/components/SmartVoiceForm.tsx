@@ -4,6 +4,8 @@ import { Mic, MicOff, Check, AlertCircle } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
+const API_URL = import.meta.env.VITE_API_URL || '';
+
 interface SmartVoiceFormProps {
   title: string;
   description: string;
@@ -63,7 +65,7 @@ export function SmartVoiceForm({ title, description, endpoint, onDataExtracted, 
       const formData = new FormData();
       formData.append("audio", new File([audioBlob], "recording.webm", { type: "audio/webm" }));
       
-      const response = await fetch(`https://agentic-backend-lyx3.onrender.com/api/voice/process`, {
+      const response = await fetch(`${API_URL}/api/voice/process`, {
         method: "POST",
         body: formData,
       });

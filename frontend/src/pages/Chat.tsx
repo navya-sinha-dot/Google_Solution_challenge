@@ -84,7 +84,7 @@ export default function Chat() {
 
     try {
       // Call the chat API
-      const API_URL = import.meta.env.VITE_API_URL || import.meta.env.REACT_APP_API_URL || 'https://agentic-backend-lyx3.onrender.com';
+      const API_URL = import.meta.env.VITE_API_URL || '';
       const response = await fetch(`${API_URL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

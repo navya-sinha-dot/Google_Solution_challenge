@@ -1,1289 +1,742 @@
 import { useState, useEffect, useRef } from "react";
 import { useTheme } from "next-themes";
-import { Button } from "@/components/ui/button";
-import { CloudRain, Leaf, Droplets, Cpu, Wifi, WifiOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { FarmBackground, GlassSection } from "@/components/FarmTheme";
+import { FarmBackground } from "@/components/FarmTheme";
 import { useLanguage } from "@/contexts/LanguageContext";
 
-export default function AIHardwareAccelerator() {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
-  const { toast } = useToast();
-  const { t } = useLanguage();
-  const [loadingRain, setLoadingRain] = useState(false);
-  const [loadingFusion, setLoadingFusion] = useState(false);
-  const [loadingCombined, setLoadingCombined] = useState(false);
+const API_URL = import.meta.env.VITE_API_URL || "";
+
+// ─── Colour palette per column ──────────────────────────────────
+// sensor = blue, core = amber/gold, model = violet, llm = emerald
+const COL_COLORS = {
+  sensor: { accent: "#3B82F6", glow: "rgba(59,130,246,0.35)", border: "rgba(59,130,246,0.55)", bg: "rgba(59,130,246,0.07)", label: "#60A5FA" },
+  core:   { accent: "#F59E0B", glow: "rgba(245,158,11,0.45)",  border: "rgba(245,158,11,0.65)", bg: "rgba(245,158,11,0.08)", label: "#FCD34D" },
+  model:  { accent: "#8B5CF6", glow: "rgba(139,92,246,0.35)",  border: "rgba(139,92,246,0.55)", bg: "rgba(139,92,246,0.07)", label: "#A78BFA" },
+  llm:    { accent: "#2ECC71", glow: "rgba(46,204,113,0.40)",  border: "rgba(46,204,113,0.60)", bg: "rgba(46,204,113,0.07)", label: "#4ADE80" },
+} as const;
+
+// Edge segment colours: from-col determines first half, to-col second half
+// We'll use the destination colour for simplicity
+const EDGE_PULSE_COLOR: Record<string, string> = {
+  "sensor→core":  COL_COLORS.core.accent,
+  "core→model":   COL_COLORS.model.accent,
+  "model→llm":    COL_COLORS.llm.accent,
+};
+
+const NODE_W = 148;
+const NODE_H = 54;
+
+interface NodeDef {
+  id: string;
+  label: string;
+  sub: string;
+  tooltip: string;
+  x: number;
+  y: number;
+  col: "sensor" | "core" | "model" | "llm";
+}
+
+const NODES: NodeDef[] = [
+  { id: "temp",     label: "Temp / Humidity", sub: "BME280 · ESP32",         tooltip: "Reads ambient temperature (°C) and relative humidity (%) from the onboard BME280 sensor fused via I²C on the ESP32.",                                                                  x: 24,  y: 40,  col: "sensor" },
+  { id: "pressure", label: "Barometric",       sub: "BMP390 · ESP32",         tooltip: "Measures atmospheric pressure (hPa). Falling pressure is a key predictor of incoming rain fronts.",                                                                                      x: 24,  y: 118, col: "sensor" },
+  { id: "soil",     label: "Soil Moisture",    sub: "Capacitive probe · ADC", tooltip: "Capacitive soil probe outputs a 0–3.3 V signal read by ESP32 ADC, converted to volumetric water content %.",                                                                             x: 24,  y: 196, col: "sensor" },
+  { id: "light",    label: "Light / UV",       sub: "TSL2591 + VEML6070",     tooltip: "TSL2591 measures lux (0–88k) and VEML6070 measures UV index. Both wired via I²C. Used in crop stress scoring.",                                                                          x: 24,  y: 274, col: "sensor" },
+  { id: "wind",     label: "Wind / Rain",      sub: "Anemometer · Gauge",     tooltip: "Pulse-count anemometer gives wind speed (km/h) and direction. Tipping bucket rain gauge counts 0.2 mm per tip.",                                                                         x: 24,  y: 352, col: "sensor" },
+  { id: "fpga",     label: "ZC706 FPGA",       sub: "Xilinx Zynq · AXI4-Lite",tooltip: "Xilinx ZC706 evaluation board. HLS-compiled C++ accelerator cores run inside the FPGA fabric and communicate with the ARM host via AXI4-Lite registers. Falls back to software simulation when no board is connected.", x: 280, y: 196, col: "core"   },
+  { id: "fusion",   label: "Sensor Fusion",    sub: "Kalman filter · HLS",    tooltip: "AXI4-Lite Kalman filter core fuses soil, temperature, humidity, and light into a single plant-health score (0–100) and a stress index (%). Removes sensor noise and weights channels by crop-type coefficients.",         x: 536, y: 118, col: "model"  },
+  { id: "rain",     label: "Rain Predictor",   sub: "Random forest · HLS",    tooltip: "Random forest model trained on 5 years of Indian monsoon data. Takes temp, humidity, pressure, and wind; outputs rain probability (%) and a 3-hour forecast horizon. Runs as an HLS core on the FPGA.",                   x: 536, y: 226, col: "model"  },
+  { id: "irrig",    label: "Irrigation AI",    sub: "Multi-factor · HLS",     tooltip: "Combines the fusion score, rain probability, and crop growth stage to compute an optimal irrigation schedule: next irrigation time, duration, and volume in litres/m².",                   x: 536, y: 334, col: "model"  },
+  { id: "groq",     label: "Groq LLM",         sub: "llama-3.1-8b-instant",   tooltip: "Groq cloud inference (llama-3.1-8b-instant). Receives the numeric FPGA outputs and translates them into plain-language field recommendations, alerts, and reasoning a farmer can act on immediately.", x: 788, y: 196, col: "llm"    },
+];
+
+interface EdgeDef { from: string; to: string; phaseShift: number; }
+const EDGES: EdgeDef[] = [
+  { from: "temp",     to: "fpga",   phaseShift: 0.00 },
+  { from: "pressure", to: "fpga",   phaseShift: 0.20 },
+  { from: "soil",     to: "fpga",   phaseShift: 0.40 },
+  { from: "light",    to: "fpga",   phaseShift: 0.60 },
+  { from: "wind",     to: "fpga",   phaseShift: 0.80 },
+  { from: "fpga",     to: "fusion", phaseShift: 0.10 },
+  { from: "fpga",     to: "rain",   phaseShift: 0.45 },
+  { from: "fpga",     to: "irrig",  phaseShift: 0.75 },
+  { from: "fusion",   to: "groq",   phaseShift: 0.05 },
+  { from: "rain",     to: "groq",   phaseShift: 0.35 },
+  { from: "irrig",    to: "groq",   phaseShift: 0.65 },
+];
+
+function nodeById(id: string) { return NODES.find(n => n.id === id)!; }
+
+function edgePath(a: NodeDef, b: NodeDef): string {
+  const x1 = a.x + NODE_W;
+  const y1 = a.y + NODE_H / 2;
+  const x2 = b.x;
+  const y2 = b.y + NODE_H / 2;
+  const mx = (x1 + x2) / 2;
+  return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
+}
+
+const VB_W = 960;
+const VB_H = 462;
+
+// ─── Edge segment type helper ────────────────────────────────────
+function edgeSegment(fromCol: string, toCol: string): string {
+  if (fromCol === "sensor" && toCol === "core")  return "sensor→core";
+  if (fromCol === "core"   && toCol === "model") return "core→model";
+  if (fromCol === "model"  && toCol === "llm")   return "model→llm";
+  return "sensor→core";
+}
+
+// ─── Canvas graph ────────────────────────────────────────────────
+function NodeGraph({
+  isDark,
+  activePipeline,
+  onHover,
+}: {
+  isDark: boolean;
+  activePipeline: string[];
+  onHover: (node: NodeDef | null, canvasX: number, canvasY: number) => void;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rafRef    = useRef<number>(0);
+  const tickRef   = useRef(0);
 
-  const [rainPrediction, setRainPrediction] = useState<any>(null);
-  const [sensorFusion, setSensorFusion] = useState<any>(null);
-  const [combinedAnalysis, setCombinedAnalysis] = useState<any>(null);
-  const [lastUpdate, setLastUpdate] = useState<string>("Never");
-  const [connectionStatus, setConnectionStatus] = useState<boolean>(false);
-  const [lastUpdateSeconds, setLastUpdateSeconds] = useState(0);
-  const [hardwareStatus, setHardwareStatus] = useState<{
-    mode: string;
-    port: string | null;
-    fpga_enabled: boolean;
-  }>({ mode: "unknown", port: null, fpga_enabled: false });
-  const [currentSensorData, setCurrentSensorData] = useState({
-    temperature: 25,
-    humidity: 60,
-    pressure: 1013,
-    wind_speed: 5,
-    rainfall: 0,
-    soil_moisture: 50,
-    soil_temperature: 26,
-    light_level: 70,
-    pm25: 60,
-    pm10: 120,
-    uv_index: 2,
-    battery_voltage: 12.5,
-  });
-
-  // ─── Floating particle animation ───────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
+    const ctx = canvas.getContext("2d")!;
     const dpr = window.devicePixelRatio || 1;
+
     const resize = () => {
       const rect = canvas.parentElement!.getBoundingClientRect();
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
+      canvas.width        = rect.width * dpr;
+      canvas.height       = (rect.width * VB_H / VB_W) * dpr;
+      canvas.style.width  = `${rect.width}px`;
+      canvas.style.height = `${rect.width * VB_H / VB_W}px`;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
     resize();
     window.addEventListener("resize", resize);
 
-    const agents = [
-      { name: "Supervisor", emoji: "" },
-      { name: "Trend", emoji: "" },
-      { name: "Output", emoji: "" },
-      { name: "Ingress", emoji: "" },
-      { name: "Health", emoji: "" },
-      { name: "Alert", emoji: "" },
-      { name: "Weather", emoji: "️" },
-      { name: "Response", emoji: "" },
-    ];
+    const px = (v: number) => v * (canvas.clientWidth  / VB_W);
+    const py = (v: number) => v * (canvas.clientHeight / VB_H);
+    const pw = (v: number) => v * (canvas.clientWidth  / VB_W);
+    const ph = (v: number) => v * (canvas.clientHeight / VB_H);
 
-    interface Particle {
-      x: number;
-      y: number;
-      vx: number;
-      vy: number;
-      radius: number;
-      name: string;
-      emoji: string;
-      glowPhase: number;
-      trail: { x: number; y: number }[];
-      isDragged?: boolean;
-    }
+    // Pre-build SVG paths for getPointAtLength
+    const edgeSvgPaths: SVGPathElement[] = EDGES.map(e => {
+      const a = nodeById(e.from);
+      const b = nodeById(e.to);
+      const el = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      el.setAttribute("d", edgePath(a, b));
+      return el;
+    });
 
-    const w = () => canvas.width / dpr;
-    const h = () => canvas.height / dpr;
-
-    const particles: Particle[] = agents.map((a, i) => ({
-      x: Math.random() * (w() - 120) + 60,
-      y: Math.random() * (h() - 120) + 60,
-      vx: (Math.random() - 0.5) * 0.6,
-      vy: (Math.random() - 0.5) * 0.6,
-      radius: 28,
-      name: a.name,
-      emoji: a.emoji,
-      glowPhase: (i / agents.length) * Math.PI * 2,
-      trail: [],
-      isDragged: false,
-    }));
-
-    let draggedParticle: Particle | null = null;
-
-    const onMouseDown = (e: MouseEvent) => {
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-
-      for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
-        const dx = p.x - mx;
-        const dy = p.y - my;
-        if (dx * dx + dy * dy <= p.radius * p.radius) {
-          draggedParticle = p;
-          p.isDragged = true;
-          canvas.style.cursor = "grabbing";
-          break;
-        }
-      }
-    };
-
-    const onMouseMove = (e: MouseEvent) => {
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const my = e.clientY - rect.top;
-
-      if (draggedParticle) {
-        draggedParticle.x = mx;
-        draggedParticle.y = my;
-        draggedParticle.vx = 0;
-        draggedParticle.vy = 0;
-      } else {
-        let hovered = false;
-        for (let p of particles) {
-          const dx = p.x - mx;
-          const dy = p.y - my;
-          if (dx * dx + dy * dy <= p.radius * p.radius) {
-            hovered = true;
-            break;
-          }
-        }
-        canvas.style.cursor = hovered ? "grab" : "default";
-      }
-    };
-
-    const onMouseUp = () => {
-      if (draggedParticle) {
-        draggedParticle.isDragged = false;
-        draggedParticle = null;
-        if (canvas) canvas.style.cursor = "grab";
-      }
-    };
-
-    const onMouseLeave = () => {
-      if (draggedParticle) {
-        draggedParticle.isDragged = false;
-        draggedParticle = null;
-        if (canvas) canvas.style.cursor = "default";
-      }
-    };
-
-    canvas.addEventListener("mousedown", onMouseDown);
-    canvas.addEventListener("mousemove", onMouseMove);
-    canvas.addEventListener("mouseup", onMouseUp);
-    canvas.addEventListener("mouseleave", onMouseLeave);
-
-    let animId: number;
-    let tick = 0;
+    const NODE_BG   = isDark ? "rgba(14,18,24,0.96)" : "rgba(255,255,255,0.96)";
+    const TEXT_PRI  = isDark ? "#F0F0F0" : "#111111";
+    const TEXT_SEC  = isDark ? "#777777" : "#888888";
+    const EDGE_IDLE = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)";
 
     const draw = () => {
-      tick++;
-      const W = w(),
-        H = h();
-      const cx = W / 2,
-        cy = H / 2;
+      tickRef.current += 0.008;
+      const t = tickRef.current;
+      ctx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
 
-      ctx.clearRect(0, 0, W, H);
+      // ── Edges ─────────────────────────────────────────────
+      EDGES.forEach((e, i) => {
+        const a    = nodeById(e.from);
+        const b    = nodeById(e.to);
+        const hot  = activePipeline.length === 0 ||
+                     (activePipeline.includes(e.from) && activePipeline.includes(e.to));
+        const seg  = edgeSegment(a.col, b.col);
+        const pCol = EDGE_PULSE_COLOR[seg] ?? "#2ECC71";
 
-      // Draw lines from each particle to center (Orchestrator)
-      particles.forEach((p) => {
-        const glow = 0.15 + Math.sin(tick * 0.02 + p.glowPhase) * 0.1;
-        const grad = ctx.createLinearGradient(cx, cy, p.x, p.y);
-        grad.addColorStop(0, `rgba(46, 204, 113, ${glow + 0.3})`);
-        grad.addColorStop(1, `rgba(46, 204, 113, ${glow})`);
+        const x1 = px(a.x + NODE_W);
+        const y1 = py(a.y + NODE_H / 2);
+        const x2 = px(b.x);
+        const y2 = py(b.y + NODE_H / 2);
+        const mx = (x1 + x2) / 2;
+
+        // Static line
         ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(p.x, p.y);
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = 1.5;
+        ctx.moveTo(x1, y1);
+        ctx.bezierCurveTo(mx, y1, mx, y2, x2, y2);
+        ctx.strokeStyle = hot ? `${pCol}55` : EDGE_IDLE;
+        ctx.lineWidth   = hot ? 1.5 : 1;
+        ctx.setLineDash(hot ? [] : [4, 5]);
         ctx.stroke();
+        ctx.setLineDash([]);
 
-        // Animated data pulse along line
-        const pulsePos = ((tick * 2 + p.glowPhase * 50) % 100) / 100;
-        const px = cx + (p.x - cx) * pulsePos;
-        const py = cy + (p.y - cy) * pulsePos;
-        ctx.beginPath();
-        ctx.arc(px, py, 3, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(46, 204, 113, ${0.8 - pulsePos * 0.5})`;
-        ctx.fill();
-      });
+        // Animated pulse dot
+        const phase  = (t + e.phaseShift) % 1;
+        const svgLen = edgeSvgPaths[i].getTotalLength();
+        const pt     = edgeSvgPaths[i].getPointAtLength(phase * svgLen);
+        const dotX   = px(pt.x);
+        const dotY   = py(pt.y);
+        const alpha  = phase < 0.1 ? phase / 0.1 : phase > 0.9 ? (1 - phase) / 0.1 : 1;
 
-      // Update & draw particles
-      particles.forEach((p) => {
-        if (!p.isDragged) {
-          // Soft boundary repulsion
-          if (p.x < 50) p.vx += 0.03;
-          if (p.x > W - 50) p.vx -= 0.03;
-          if (p.y < 50) p.vy += 0.03;
-          if (p.y > H - 50) p.vy -= 0.03;
-
-          // Gentle random drift
-          p.vx += (Math.random() - 0.5) * 0.02;
-          p.vy += (Math.random() - 0.5) * 0.02;
-
-          // Damping
-          p.vx *= 0.995;
-          p.vy *= 0.995;
-
-          // Speed limit
-          const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
-          if (speed > 1) {
-            p.vx *= 1 / speed;
-            p.vy *= 1 / speed;
-          }
-
-          p.x += p.vx;
-          p.y += p.vy;
-        } else {
-          p.vx = 0;
-          p.vy = 0;
-        }
-
-        // Trail
-        p.trail.push({ x: p.x, y: p.y });
-        if (p.trail.length > 12) p.trail.shift();
-
-        // Draw trail
-        for (let i = 0; i < p.trail.length - 1; i++) {
-          const alpha = (i / p.trail.length) * 0.2;
+        // Trailing glow
+        if (hot) {
           ctx.beginPath();
-          ctx.arc(p.trail[i].x, p.trail[i].y, 2, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(46, 204, 113, ${alpha})`;
+          ctx.arc(dotX, dotY, pw(9), 0, Math.PI * 2);
+          ctx.fillStyle = `${pCol}${Math.round(0.10 * alpha * 255).toString(16).padStart(2, "0")}`;
           ctx.fill();
         }
 
-        // Glow
-        const glowSize = 38 + Math.sin(tick * 0.03 + p.glowPhase) * 6;
-        const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowSize);
-        grd.addColorStop(0, "rgba(46, 204, 113, 0.25)");
-        grd.addColorStop(1, "rgba(46, 204, 113, 0)");
         ctx.beginPath();
-        ctx.arc(p.x, p.y, glowSize, 0, Math.PI * 2);
-        ctx.fillStyle = grd;
+        ctx.arc(dotX, dotY, hot ? pw(4) : pw(2.5), 0, Math.PI * 2);
+        ctx.fillStyle = hot
+          ? `${pCol}${Math.round(0.9 * alpha * 255).toString(16).padStart(2, "0")}`
+          : `rgba(160,160,160,${0.3 * alpha})`;
         ctx.fill();
-
-        // Particle circle
-        const pgrd = ctx.createRadialGradient(
-          p.x - 6,
-          p.y - 6,
-          2,
-          p.x,
-          p.y,
-          p.radius
-        );
-        pgrd.addColorStop(0, "rgba(39, 174, 96, 0.95)");
-        pgrd.addColorStop(1, "rgba(13, 59, 27, 0.95)");
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.fillStyle = pgrd;
-        ctx.fill();
-        ctx.strokeStyle = "rgba(46, 204, 113, 0.4)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // Emoji & Name
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        if (p.emoji) {
-          ctx.font = "14px sans-serif";
-          ctx.fillText(p.emoji, p.x, p.y - 8);
-          ctx.font = "bold 10px 'Inter', sans-serif";
-          ctx.fillStyle = "#FFFFFF";
-          ctx.fillText(p.name, p.x, p.y + 8);
-        } else {
-          ctx.font = "bold 10px 'Inter', sans-serif";
-          ctx.fillStyle = "#FFFFFF";
-          ctx.fillText(p.name, p.x, p.y);
-        }
       });
 
-      // Central Orchestrator with pulse
-      const oGlow = 48 + Math.sin(tick * 0.025) * 10;
-      const ogrd = ctx.createRadialGradient(cx, cy, 0, cx, cy, oGlow);
-      ogrd.addColorStop(0, "rgba(46, 204, 113, 0.35)");
-      ogrd.addColorStop(0.6, "rgba(46, 204, 113, 0.1)");
-      ogrd.addColorStop(1, "rgba(46, 204, 113, 0)");
-      ctx.beginPath();
-      ctx.arc(cx, cy, oGlow, 0, Math.PI * 2);
-      ctx.fillStyle = ogrd;
-      ctx.fill();
+      // ── Nodes ─────────────────────────────────────────────
+      NODES.forEach(n => {
+        const x    = px(n.x);
+        const y    = py(n.y);
+        const w    = pw(NODE_W);
+        const h    = ph(NODE_H);
+        const r    = pw(8);
+        const cc   = COL_COLORS[n.col];
+        const isHot = activePipeline.length === 0 || activePipeline.includes(n.id);
 
-      // Outer ring
-      ctx.beginPath();
-      ctx.arc(cx, cy, 36, 0, Math.PI * 2);
-      const coreGrd = ctx.createRadialGradient(cx - 8, cy - 8, 3, cx, cy, 36);
-      coreGrd.addColorStop(0, "#2ECC71");
-      coreGrd.addColorStop(1, "#1B5E20");
-      ctx.fillStyle = coreGrd;
-      ctx.fill();
-      ctx.strokeStyle = "rgba(46, 204, 113, 0.5)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
+        // Glow halo
+        ctx.shadowBlur  = isHot ? pw(n.col === "core" ? 16 : 10) : 0;
+        ctx.shadowColor = isHot ? cc.glow : "transparent";
 
-      ctx.font = "bold 11px 'Inter', sans-serif";
-      ctx.fillStyle = "#FFFFFF";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText("Orchestrator", cx, cy);
+        // Card
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, r);
+        ctx.fillStyle = isHot
+          ? isDark ? `${cc.accent}15` : `${cc.accent}0D`
+          : NODE_BG;
+        ctx.fill();
+        ctx.shadowBlur  = 0;
+        ctx.shadowColor = "transparent";
 
-      animId = requestAnimationFrame(draw);
+        // Border
+        ctx.beginPath();
+        ctx.roundRect(x, y, w, h, r);
+        ctx.strokeStyle = isHot ? cc.border : (isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.09)");
+        ctx.lineWidth   = isHot ? 1.5 : 1;
+        ctx.stroke();
+
+        // Left accent bar
+        ctx.beginPath();
+        ctx.roundRect(x, y + ph(10), pw(3), ph(NODE_H - 20), pw(1.5));
+        ctx.fillStyle = isHot ? cc.accent : (isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.10)");
+        ctx.fill();
+
+        // Label
+        ctx.font      = `600 ${pw(12)}px "Inter", system-ui, sans-serif`;
+        ctx.fillStyle = isHot ? TEXT_PRI : (isDark ? "rgba(240,240,240,0.38)" : "rgba(17,17,17,0.35)");
+        ctx.textAlign = "left";
+        ctx.fillText(n.label, x + pw(14), y + ph(20));
+
+        // Sub-label
+        ctx.font      = `400 ${pw(10)}px "Inter", system-ui, sans-serif`;
+        ctx.fillStyle = isHot
+          ? cc.label
+          : (isDark ? "rgba(120,120,120,0.4)" : "rgba(100,100,100,0.4)");
+        ctx.fillText(n.sub, x + pw(14), y + ph(36));
+      });
+
+      rafRef.current = requestAnimationFrame(draw);
     };
 
     draw();
     return () => {
-      cancelAnimationFrame(animId);
+      cancelAnimationFrame(rafRef.current);
       window.removeEventListener("resize", resize);
-      canvas.removeEventListener("mousedown", onMouseDown);
-      canvas.removeEventListener("mousemove", onMouseMove);
-      canvas.removeEventListener("mouseup", onMouseUp);
-      canvas.removeEventListener("mouseleave", onMouseLeave);
     };
-  }, []);
+  }, [isDark, activePipeline]);
 
-  // ─── Data fetching ─────────────────────────────────────────────
-  useEffect(() => {
-    fetchSensorData();
-    fetchHardwareStatus();
-    const interval = setInterval(() => {
-      fetchSensorData();
-      setLastUpdateSeconds((s) => s + 10);
-    }, 10000);
-    return () => clearInterval(interval);
-  }, []);
+  // ── Mouse hover – report vb coords back to parent ─────────────
+  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect   = canvas.getBoundingClientRect();
+    const mx     = e.clientX - rect.left;
+    const my     = e.clientY - rect.top;
+    const scaleX = canvas.clientWidth  / VB_W;
+    const scaleY = canvas.clientHeight / VB_H;
 
-  const fetchHardwareStatus = async () => {
-    try {
-      const response = await fetch("https://agentic-backend-lyx3.onrender.com/api/fpga/status");
-      if (response.ok) {
-        const data = await response.json();
-        setHardwareStatus({
-          mode: data.hardware_mode || "unknown",
-          port: data.port || null,
-          fpga_enabled: data.fpga_enabled || false,
-        });
-      }
-    } catch {
-      setHardwareStatus({
-        mode: "disconnected",
-        port: null,
-        fpga_enabled: false,
-      });
+    let found: NodeDef | null = null;
+    for (const n of NODES) {
+      if (
+        mx >= n.x * scaleX &&
+        mx <= (n.x + NODE_W) * scaleX &&
+        my >= n.y * scaleY &&
+        my <= (n.y + NODE_H) * scaleY
+      ) { found = n; break; }
     }
+    // Pass canvas-relative coords for tooltip positioning
+    onHover(found, mx, my);
   };
 
-  const fetchSensorData = async () => {
-    try {
-      const response = await fetch(
-        "https://agentic-backend-lyx3.onrender.com/api/sensors/latest/WS01"
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setConnectionStatus(true);
-        setLastUpdateSeconds(0);
-        setCurrentSensorData({
-          temperature: data.temperature ?? 25,
-          humidity: data.humidity ?? 60,
-          pressure: data.pressure ?? 1013,
-          wind_speed: data.windSpeed ?? data.wind_speed ?? 5,
-          rainfall: data.rainfall ?? 0,
-          soil_moisture: data.soilMoisture ?? data.soil_moisture ?? 50,
-          soil_temperature: data.soilTemperature ?? data.soil_temperature ?? 26,
-          light_level: data.lightIntensity ?? data.light_level ?? 70,
-          pm25: data.airQualityPM25 ?? data.pm25 ?? 60,
-          pm10: data.airQualityPM10 ?? data.pm10 ?? 120,
-          uv_index: data.uvIndex ?? data.uv_index ?? 2,
-          battery_voltage: data.batteryVoltage ?? data.battery_voltage ?? 12.5,
-        });
-        setLastUpdate(new Date().toLocaleTimeString());
-      }
-    } catch {
-      setConnectionStatus(false);
-    }
-  };
+  const handleMouseLeave = () => onHover(null, 0, 0);
 
-  // ─── FPGA actions ──────────────────────────────────────────────
-  const predictRain = async () => {
-    setLoadingRain(true);
-    try {
-      const response = await fetch(
-        "https://agentic-backend-lyx3.onrender.com/api/fpga/rain-predict",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            temperature: currentSensorData.temperature,
-            humidity: currentSensorData.humidity,
-            pressure: currentSensorData.pressure,
-            wind_speed: currentSensorData.wind_speed,
-          }),
-        }
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setRainPrediction(data);
-        if (data.hardware_mode)
-          setHardwareStatus((p) => ({ ...p, mode: data.hardware_mode }));
-        toast({
-          title: " Rain Prediction Complete",
-          description: `${data.prediction.rain_probability}% via ${
-            data.hardware_mode === "real_hardware" ? "COM4" : "ML Model Cache"
-          }`,
-        });
-      } else {
-        toast({
-          title: " Prediction Failed",
-          description: "Could not reach FPGA",
-          variant: "destructive",
-        });
-      }
-    } catch {
-      toast({
-        title: " Error",
-        description: "Connection to backend failed",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingRain(false);
-    }
-  };
+  return (
+    <canvas
+      ref={canvasRef}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      style={{ display: "block", width: "100%", cursor: "default" }}
+    />
+  );
+}
 
-  const runSensorFusion = async () => {
-    setLoadingFusion(true);
-    try {
-      const response = await fetch("https://agentic-backend-lyx3.onrender.com/api/fpga/fusion", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          soil_moisture: currentSensorData.soil_moisture,
-          temperature: currentSensorData.temperature,
-          humidity: currentSensorData.humidity,
-          light_level: currentSensorData.light_level,
-        }),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setSensorFusion(data);
-        if (data.hardware_mode)
-          setHardwareStatus((p) => ({ ...p, mode: data.hardware_mode }));
-        toast({
-          title: "Sensor Fusion Analysis Complete",
-          description: `via ${
-            data.hardware_mode === "real_hardware"
-              ? "COM4 Hardware"
-              : "ML Prediction Cache"
-          }`,
-        });
-      } else {
-        toast({ title: " Analysis Failed", variant: "destructive" });
-      }
-    } catch {
-      toast({
-        title: " Error",
-        description: "Connection failed",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingFusion(false);
-    }
-  };
+// ─── Tooltip (positioned relative to graph container) ────────────
+function Tooltip({
+  node,
+  x,
+  y,
+  isDark,
+  containerRef,
+}: {
+  node: NodeDef;
+  x: number;        // canvas-relative px
+  y: number;        // canvas-relative px
+  isDark: boolean;
+  containerRef: React.RefObject<HTMLDivElement>;
+}) {
+  const cc = COL_COLORS[node.col];
+  // Offset tip 16px right and a bit above cursor
+  const tipX = x + 16;
+  const tipY = y - 10;
 
-  const runCombinedAnalysis = async () => {
-    setLoadingCombined(true);
-    try {
-      const response = await fetch(
-        "https://agentic-backend-lyx3.onrender.com/api/fpga/combined-analysis",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            soil_moisture: currentSensorData.soil_moisture,
-            temperature: currentSensorData.temperature,
-            humidity: currentSensorData.humidity,
-            light_level: currentSensorData.light_level,
-          }),
-        }
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setCombinedAnalysis(data);
-        if (data.hardware_mode)
-          setHardwareStatus((p) => ({ ...p, mode: data.hardware_mode }));
-        toast({ title: "Irrigation Analysis Complete" });
-      } else {
-        toast({ title: " Analysis Failed", variant: "destructive" });
-      }
-    } catch {
-      toast({
-        title: " Error",
-        description: "Connection failed",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingCombined(false);
-    }
-  };
-
-  const getRiskColor = (probability: number) => {
-    if (probability >= 80) return { bg: "#FEE2E2", text: "#DC2626" };
-    if (probability >= 60) return { bg: "#FED7AA", text: "#EA580C" };
-    if (probability >= 40) return { bg: "#FEF3C7", text: "#D97706" };
-    if (probability >= 20) return { bg: "#DBEAFE", text: "#2563EB" };
-    return { bg: "#DCFCE7", text: "#16A34A" };
-  };
-
-  const hwBadge =
-    hardwareStatus.mode === "real_hardware"
-      ? {
-          label: t("accel_connected"),
-          color: "#2ECC71",
-          bg: "rgba(46,204,113,0.15)",
-          icon: <Wifi style={{ width: 14, height: 14 }} />,
-        }
-      : hardwareStatus.mode === "simulation"
-      ? {
-          label: t("accel_simulation"),
-          color: "#F59E0B",
-          bg: "rgba(245,158,11,0.15)",
-          icon: <Cpu style={{ width: 14, height: 14 }} />,
-        }
-      : {
-          label: t("accel_disconnected"),
-          color: "#EF4444",
-          bg: "rgba(239,68,68,0.15)",
-          icon: <WifiOff style={{ width: 14, height: 14 }} />,
-        };
-
-  const modeBadge = (mode?: string) => (
-    <span
+  return (
+    <div
       style={{
-        fontSize: "0.7rem",
-        padding: "0.2rem 0.6rem",
-        borderRadius: 9999,
-        backgroundColor:
-          mode === "real_hardware"
-            ? "rgba(46,204,113,0.2)"
-            : "rgba(245,158,11,0.2)",
-        color: mode === "real_hardware" ? "#2ECC71" : "#F59E0B",
+        position: "absolute",
+        left: tipX,
+        top:  tipY,
+        zIndex: 9999,
+        maxWidth: 280,
+        padding: "0.65rem 0.85rem",
+        borderRadius: 8,
+        background: isDark ? "rgba(10,13,18,0.97)" : "rgba(255,255,255,0.97)",
+        border: `1px solid ${cc.border}`,
+        boxShadow: `0 4px 24px rgba(0,0,0,0.28), 0 0 0 1px ${cc.accent}22`,
+        pointerEvents: "none",
+        // Clamp so it doesn't overflow right edge
+        transform: "translateY(-50%)",
       }}
     >
-      {mode === "real_hardware" ? t("accel_hardware") : t("accel_simulation")}
-    </span>
+      <p style={{ margin: "0 0 0.3rem", fontSize: "0.78rem", fontWeight: 700, color: cc.accent }}>
+        {node.label}
+      </p>
+      <p style={{ margin: "0 0 0.3rem", fontSize: "0.7rem", color: isDark ? "#555" : "#AAA", fontFamily: "monospace" }}>
+        {node.sub}
+      </p>
+      <p style={{ margin: 0, fontSize: "0.74rem", color: isDark ? "#C0C0C0" : "#444", lineHeight: 1.55 }}>
+        {node.tooltip}
+      </p>
+    </div>
   );
+}
 
-  // ─── Render ────────────────────────────────────────────────────
+// ─── Column legend bar ───────────────────────────────────────────
+function ColLegend({ isDark }: { isDark: boolean }) {
+  const cols: { label: string; col: keyof typeof COL_COLORS }[] = [
+    { label: "Sensors",   col: "sensor" },
+    { label: "FPGA Core", col: "core"   },
+    { label: "AI Models", col: "model"  },
+    { label: "LLM",       col: "llm"    },
+  ];
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.55rem", paddingRight: "0.25rem" }}>
+      {cols.map(c => (
+        <div key={c.label} style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: COL_COLORS[c.col].accent, display: "inline-block" }} />
+          <span style={{ fontSize: "0.63rem", fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: COL_COLORS[c.col].label }}>
+            {c.label}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Metric tile ─────────────────────────────────────────────────
+function Tile({ value, unit, label, sub, isDark }: { value: string | number; unit?: string; label: string; sub: string; isDark: boolean }) {
+  return (
+    <div style={{ flex: 1, minWidth: 130, padding: "0.9rem 1.1rem", borderRadius: 10, background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.025)", border: `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)"}`, borderLeft: "2.5px solid #2ECC71" }}>
+      <p style={{ fontSize: "0.7rem", color: isDark ? "#666" : "#999", margin: "0 0 0.3rem", fontWeight: 500 }}>{label}</p>
+      <p style={{ fontSize: "1.55rem", fontWeight: 700, color: isDark ? "#E8E8E8" : "#111", lineHeight: 1, margin: "0 0 0.2rem" }}>
+        {value}{unit && <span style={{ fontSize: "0.8rem", marginLeft: 2, fontWeight: 500 }}>{unit}</span>}
+      </p>
+      <p style={{ fontSize: "0.65rem", color: isDark ? "#555" : "#AAA", margin: 0 }}>{sub}</p>
+    </div>
+  );
+}
+
+// ─── Progress bar ────────────────────────────────────────────────
+function Bar({ value, isDark }: { value: number; isDark: boolean }) {
+  const color = value >= 80 ? "#ef4444" : value >= 60 ? "#f97316" : value >= 40 ? "#eab308" : value >= 20 ? "#3b82f6" : "#22c55e";
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.35rem" }}>
+        <span style={{ fontSize: "0.72rem", color: isDark ? "#666" : "#999", fontWeight: 500 }}>Rain probability</span>
+        <span style={{ fontSize: "1.9rem", fontWeight: 800, color: isDark ? "#E8E8E8" : "#111", lineHeight: 1 }}>{value}<span style={{ fontSize: "1rem" }}>%</span></span>
+      </div>
+      <div style={{ height: 6, borderRadius: 3, background: isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)", overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${value}%`, background: color, borderRadius: 3, transition: "width 0.7s ease" }} />
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.3rem" }}>
+        {["Very low","Low","Moderate","High","Very high"].map(l => (
+          <span key={l} style={{ fontSize: "0.6rem", color: isDark ? "#444" : "#CCC" }}>{l}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── How-it-works block ──────────────────────────────────────────
+function HowBlock({ steps, isDark }: { steps: string[]; isDark: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginTop: "1.1rem" }}>
+      <button onClick={() => setOpen(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "0.72rem", fontWeight: 600, color: "#2ECC71", display: "flex", alignItems: "center", gap: "0.4rem", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+        How it's calculated {open ? "▲" : "▼"}
+      </button>
+      {open && (
+        <div style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.45rem" }}>
+          {steps.map((s, i) => (
+            <div key={i} style={{ display: "flex", gap: "0.7rem", alignItems: "flex-start" }}>
+              <span style={{ width: 18, height: 18, borderRadius: "50%", flexShrink: 0, marginTop: 1, background: isDark ? "rgba(46,204,113,0.12)" : "rgba(46,204,113,0.1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.6rem", fontWeight: 700, color: "#2ECC71" }}>{i + 1}</span>
+              <p style={{ margin: 0, fontSize: "0.77rem", color: isDark ? "#B0B0B0" : "#555", lineHeight: 1.55 }}>{s}</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── LLM insight block ───────────────────────────────────────────
+function LLMBlock({ text, isDark }: { text: string; isDark: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginTop: "0.9rem" }}>
+      <button onClick={() => setOpen(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "0.72rem", fontWeight: 600, color: isDark ? "#888" : "#666", display: "flex", alignItems: "center", gap: "0.4rem", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+        Groq LLM analysis {open ? "▲" : "▼"}
+      </button>
+      {open && (
+        <div style={{ marginTop: "0.75rem", padding: "0.9rem 1.1rem", borderRadius: 8, background: isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.025)", borderLeft: `2px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)"}` }}>
+          <p style={{ margin: 0, fontSize: "0.78rem", color: isDark ? "#B0B0B0" : "#444", lineHeight: 1.7, whiteSpace: "pre-line" }}>{text}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Result card ─────────────────────────────────────────────────
+function ResultCard({ title, modeLabel, children, isDark }: { title: string; modeLabel: string; children: React.ReactNode; isDark: boolean }) {
+  return (
+    <div style={{ borderRadius: 14, border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`, borderTop: "1.5px solid #2ECC71", background: isDark ? "rgba(12,16,20,0.88)" : "rgba(255,255,255,0.92)", backdropFilter: "blur(12px)", marginBottom: "1rem", overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1.1rem 1.4rem 0.8rem" }}>
+        <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: isDark ? "#F0F0F0" : "#111" }}>{title}</h3>
+        <span style={{ fontSize: "0.65rem", fontWeight: 600, padding: "0.2rem 0.65rem", borderRadius: 9999, background: modeLabel === "real_hardware" ? "rgba(46,204,113,0.12)" : isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.05)", color: modeLabel === "real_hardware" ? "#2ECC71" : isDark ? "#888" : "#666", border: modeLabel === "real_hardware" ? "1px solid rgba(46,204,113,0.25)" : `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"}`, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          {modeLabel === "real_hardware" ? "Hardware" : "Simulation"}
+        </span>
+      </div>
+      <div style={{ padding: "0 1.4rem 1.4rem" }}>{children}</div>
+    </div>
+  );
+}
+
+// ─── Action button ───────────────────────────────────────────────
+function ActionBtn({ label, loadingLabel, loading, onClick, isDark }: { label: string; loadingLabel: string; loading: boolean; onClick: () => void; isDark: boolean }) {
+  return (
+    <button onClick={onClick} disabled={loading} style={{ width: "100%", padding: "0.6rem 1rem", borderRadius: 8, border: "1px solid rgba(46,204,113,0.4)", background: loading ? isDark ? "rgba(46,204,113,0.08)" : "rgba(46,204,113,0.06)" : isDark ? "rgba(46,204,113,0.12)" : "rgba(46,204,113,0.1)", color: "#2ECC71", fontWeight: 600, fontSize: "0.82rem", cursor: loading ? "not-allowed" : "pointer", transition: "background 0.15s", letterSpacing: "0.02em" }}>
+      {loading ? `${loadingLabel}…` : label}
+    </button>
+  );
+}
+
+// ─── Main export ─────────────────────────────────────────────────
+export default function AIHardwareAccelerator() {
+  const { theme } = useTheme();
+  const isDark    = theme === "dark";
+  const { toast } = useToast();
+  const { t }     = useLanguage();
+
+  const [loadingRain,     setLoadingRain]     = useState(false);
+  const [loadingFusion,   setLoadingFusion]   = useState(false);
+  const [loadingCombined, setLoadingCombined] = useState(false);
+  const [rainResult,      setRainResult]      = useState<any>(null);
+  const [fusionResult,    setFusionResult]    = useState<any>(null);
+  const [combinedResult,  setCombinedResult]  = useState<any>(null);
+  const [connectionStatus,   setConnectionStatus]   = useState(false);
+  const [lastUpdateSeconds,  setLastUpdateSeconds]  = useState(0);
+  const [hwMode,             setHwMode]             = useState("unknown");
+  const [activePipeline,     setActivePipeline]     = useState<string[]>([]);
+
+  // Tooltip state — canvas-relative coordinates
+  const graphContainerRef = useRef<HTMLDivElement>(null);
+  const [hoveredNode, setHoveredNode] = useState<NodeDef | null>(null);
+  const [tipX, setTipX] = useState(0);
+  const [tipY, setTipY] = useState(0);
+
+  const [sensor, setSensor] = useState({
+    temperature: 25, humidity: 60, pressure: 1013, wind_speed: 5,
+    rainfall: 0, soil_moisture: 50, soil_temperature: 26,
+    light_level: 70, pm25: 60, pm10: 120, uv_index: 2, battery_voltage: 12.5,
+  });
+
+  useEffect(() => {
+    fetchSensor(); fetchHw();
+    const iv = setInterval(() => { fetchSensor(); setLastUpdateSeconds(s => s + 10); }, 10000);
+    return () => clearInterval(iv);
+  }, []);
+
+  const fetchHw = async () => {
+    try {
+      const r = await fetch(`${API_URL}/api/fpga/status`);
+      if (r.ok) { const d = await r.json(); setHwMode(d.hardware_mode || "unknown"); }
+    } catch { setHwMode("disconnected"); }
+  };
+
+  const fetchSensor = async () => {
+    try {
+      const r = await fetch(`${API_URL}/api/sensors/latest/WS01`);
+      if (r.ok) {
+        const d = await r.json();
+        setConnectionStatus(true); setLastUpdateSeconds(0);
+        setSensor({
+          temperature:      d.temperature       ?? 25,
+          humidity:         d.humidity          ?? 60,
+          pressure:         d.pressure          ?? 1013,
+          wind_speed:       d.windSpeed         ?? d.wind_speed    ?? 5,
+          rainfall:         d.rainfall          ?? 0,
+          soil_moisture:    d.soilMoisture      ?? d.soil_moisture ?? 50,
+          soil_temperature: d.soilTemperature   ?? d.soil_temperature ?? 26,
+          light_level:      d.lightIntensity    ?? d.light_level   ?? 70,
+          pm25:             d.airQualityPM25    ?? d.pm25          ?? 60,
+          pm10:             d.airQualityPM10    ?? d.pm10          ?? 120,
+          uv_index:         d.uvIndex           ?? d.uv_index      ?? 2,
+          battery_voltage:  d.batteryVoltage    ?? d.battery_voltage ?? 12.5,
+        });
+      }
+    } catch { setConnectionStatus(false); }
+  };
+
+  const predictRain = async () => {
+    setLoadingRain(true);
+    setActivePipeline(["temp","pressure","wind","fpga","rain","groq"]);
+    try {
+      const r = await fetch(`${API_URL}/api/fpga/rain-predict`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ temperature: sensor.temperature, humidity: sensor.humidity, pressure: sensor.pressure, wind_speed: sensor.wind_speed }) });
+      if (r.ok) { const d = await r.json(); setRainResult(d); if (d.hardware_mode) setHwMode(d.hardware_mode); toast({ title: "Rain prediction complete" }); }
+      else toast({ title: "Prediction failed", variant: "destructive" });
+    } catch { toast({ title: "Connection error", variant: "destructive" }); }
+    finally { setLoadingRain(false); setActivePipeline([]); }
+  };
+
+  const runFusion = async () => {
+    setLoadingFusion(true);
+    setActivePipeline(["temp","soil","light","fpga","fusion","groq"]);
+    try {
+      const r = await fetch(`${API_URL}/api/fpga/fusion`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ soil_moisture: sensor.soil_moisture, temperature: sensor.temperature, humidity: sensor.humidity, light_level: sensor.light_level }) });
+      if (r.ok) { const d = await r.json(); setFusionResult(d); if (d.hardware_mode) setHwMode(d.hardware_mode); toast({ title: "Sensor fusion complete" }); }
+      else toast({ title: "Fusion failed", variant: "destructive" });
+    } catch { toast({ title: "Connection error", variant: "destructive" }); }
+    finally { setLoadingFusion(false); setActivePipeline([]); }
+  };
+
+  const runCombined = async () => {
+    setLoadingCombined(true);
+    setActivePipeline(["temp","pressure","soil","light","wind","fpga","fusion","rain","irrig","groq"]);
+    try {
+      const r = await fetch(`${API_URL}/api/fpga/combined-analysis`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ soil_moisture: sensor.soil_moisture, temperature: sensor.temperature, humidity: sensor.humidity, light_level: sensor.light_level }) });
+      if (r.ok) { const d = await r.json(); setCombinedResult(d); if (d.hardware_mode) setHwMode(d.hardware_mode); toast({ title: "Irrigation analysis complete" }); }
+      else toast({ title: "Analysis failed", variant: "destructive" });
+    } catch { toast({ title: "Connection error", variant: "destructive" }); }
+    finally { setLoadingCombined(false); setActivePipeline([]); }
+  };
+
+  const hwLabel = hwMode === "real_hardware" ? "ZC706 connected" : hwMode === "simulation" ? "Simulation mode" : "Disconnected";
+  const hwColor = hwMode === "real_hardware" ? "#2ECC71" : hwMode === "simulation" ? (isDark ? "#888" : "#666") : "#ef4444";
+
+  const handleHover = (node: NodeDef | null, cx: number, cy: number) => {
+    setHoveredNode(node);
+    if (node) { setTipX(cx); setTipY(cy); }
+  };
+
   return (
     <div style={{ minHeight: "100vh", position: "relative" }}>
       <FarmBackground />
       <div style={{ position: "relative", zIndex: 50 }}>
-        <DashboardHeader
-          lastUpdateSeconds={lastUpdateSeconds}
-          sensorNodeOnline={connectionStatus}
-        />
+        <DashboardHeader lastUpdateSeconds={lastUpdateSeconds} sensorNodeOnline={connectionStatus} />
       </div>
-      <div
-        style={{
-          padding: "2rem",
-          maxWidth: "1400px",
-          margin: "0 auto",
-          position: "relative",
-          zIndex: 40,
-        }}
-      >
-        {/* Hardware badge row */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            marginBottom: "1rem",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              padding: "0.4rem 1rem",
-              borderRadius: 9999,
-              backgroundColor: hwBadge.bg,
-              border: `1px solid ${hwBadge.color}40`,
-              color: hwBadge.color,
-              fontSize: "0.85rem",
-              fontWeight: 600,
-            }}
-          >
-            {hwBadge.icon} {hwBadge.label}
+
+      <div style={{ position: "relative", zIndex: 40, padding: "1.75rem 2rem", maxWidth: 1300, margin: "0 auto" }}>
+
+        {/* Page header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "1.5rem", flexWrap: "wrap", gap: "0.75rem" }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: "1.35rem", fontWeight: 800, color: isDark ? "#F0F0F0" : "#111", letterSpacing: "-0.01em" }}>
+              AI Hardware Accelerator
+            </h1>
+            <p style={{ margin: "0.25rem 0 0", fontSize: "0.8rem", color: isDark ? "#666" : "#999" }}>
+              FPGA-accelerated sensor fusion · rain prediction · irrigation intelligence
+            </p>
+          </div>
+          <span style={{ fontSize: "0.72rem", fontWeight: 600, padding: "0.3rem 0.85rem", borderRadius: 9999, border: `1px solid ${hwColor}40`, color: hwColor, background: `${hwColor}10`, letterSpacing: "0.04em" }}>
+            {hwLabel}
+          </span>
+        </div>
+
+        {/* Graph panel */}
+        <div style={{ borderRadius: 16, border: `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)"}`, background: isDark ? "rgba(8,11,15,0.9)" : "rgba(250,252,250,0.92)", backdropFilter: "blur(16px)", padding: "1.25rem 1.5rem 1rem", marginBottom: "1.5rem", overflow: "hidden" }}>
+
+          <ColLegend isDark={isDark} />
+
+          <p style={{ margin: "0 0 0.75rem", fontSize: "0.67rem", color: isDark ? "#444" : "#CCC", textAlign: "right" }}>
+            Hover over any node for details · Edges animate live data flow
+          </p>
+
+          {/* Relative container so tooltip is positioned inside it */}
+          <div ref={graphContainerRef} style={{ position: "relative" }}>
+            <NodeGraph isDark={isDark} activePipeline={activePipeline} onHover={handleHover} />
+            {hoveredNode && (
+              <Tooltip node={hoveredNode} x={tipX} y={tipY} isDark={isDark} containerRef={graphContainerRef} />
+            )}
           </div>
         </div>
 
-        {/* Floating particle visualization */}
-        <div style={{ marginBottom: "2.5rem", position: "relative" }}>
-          <GlassSection style={{ padding: 0, overflow: "hidden" }}>
-            <h3
-              style={{
-                fontSize: "1.15rem",
-                fontWeight: "bold",
-                color: isDark ? "#FFFFFF" : "#1B3A20",
-                textAlign: "center",
-                padding: "1.2rem 0 0",
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-              }}
-            >
-              AI Workflow in Action
-            </h3>
-            <div
-              style={{ position: "relative", width: "100%", height: "240px" }}
-            >
-              <canvas
-                ref={canvasRef}
-                style={{ display: "block", width: "100%", height: "100%" }}
-              />
-            </div>
-          </GlassSection>
+        {/* Pipeline cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1rem", marginBottom: "1.75rem" }}>
 
-          {/* Live agents sidebar */}
-          <div
-            style={{
-              position: "absolute",
-              top: "1rem",
-              right: "1rem",
-              width: 240,
-              zIndex: 100,
-            }}
-          >
-            <GlassSection style={{ padding: "1rem" }}>
-              <h4
-                style={{
-                  fontSize: "0.85rem",
-                  fontWeight: "bold",
-                  color: "#2ECC71",
-                  marginBottom: "0.75rem",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                Active Agents
-              </h4>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "0.5rem",
-                }}
-              >
-                {[
-                  "Supervisor",
-                  "Trend",
-                  "Output",
-                  "Ingress",
-                  "Health",
-                  "Alert",
-                  "Weather",
-                  "Response",
-                ].map((a) => (
-                  <div
-                    key={a}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.6rem",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        backgroundColor: "#2ECC71",
-                        boxShadow: "0 0 6px #2ECC71",
-                      }}
-                    />
-                    <span
-                      style={{
-                        fontSize: "0.8rem",
-                        color: isDark ? "#E5E7EB" : "#1B3A20",
-                      }}
-                    >
-                      {a}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: "0.65rem",
-                        color: isDark ? "#A7F3D0" : "#15803D",
-                        marginLeft: "auto",
-                      }}
-                    >
-                      Live
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </GlassSection>
+          {/* Rain */}
+          <div style={{ borderRadius: 14, padding: "1.25rem 1.4rem", border: `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)"}`, background: isDark ? "rgba(12,16,20,0.88)" : "rgba(255,255,255,0.9)", backdropFilter: "blur(12px)" }}>
+            <p style={{ margin: "0 0 0.35rem", fontSize: "0.72rem", fontWeight: 700, color: isDark ? "#555" : "#BBB", textTransform: "uppercase", letterSpacing: "0.08em" }}>Pipeline 1</p>
+            <h3 style={{ margin: "0 0 0.5rem", fontSize: "1rem", fontWeight: 700, color: isDark ? "#E8E8E8" : "#111" }}>Rain Prediction</h3>
+            <p style={{ margin: "0 0 0.85rem", fontSize: "0.78rem", color: isDark ? "#888" : "#666", lineHeight: 1.55 }}>
+              Sends temperature, humidity, barometric pressure, and wind speed to the FPGA random-forest HLS core. Outputs rain probability (%) and a confidence score.
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", marginBottom: "1rem" }}>
+              {["Temp","Humidity","Pressure","Wind"].map(s => (
+                <span key={s} style={{ fontSize: "0.65rem", padding: "0.15rem 0.5rem", borderRadius: 9999, background: isDark ? "rgba(59,130,246,0.08)" : "rgba(59,130,246,0.07)", color: "#60A5FA", border: "1px solid rgba(59,130,246,0.25)" }}>{s}</span>
+              ))}
+            </div>
+            <ActionBtn label="Run Rain Prediction" loadingLabel="Processing on FPGA" loading={loadingRain} onClick={predictRain} isDark={isDark} />
+          </div>
+
+          {/* Fusion */}
+          <div style={{ borderRadius: 14, padding: "1.25rem 1.4rem", border: `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)"}`, background: isDark ? "rgba(12,16,20,0.88)" : "rgba(255,255,255,0.9)", backdropFilter: "blur(12px)" }}>
+            <p style={{ margin: "0 0 0.35rem", fontSize: "0.72rem", fontWeight: 700, color: isDark ? "#555" : "#BBB", textTransform: "uppercase", letterSpacing: "0.08em" }}>Pipeline 2</p>
+            <h3 style={{ margin: "0 0 0.5rem", fontSize: "1rem", fontWeight: 700, color: isDark ? "#E8E8E8" : "#111" }}>Sensor Fusion</h3>
+            <p style={{ margin: "0 0 0.85rem", fontSize: "0.78rem", color: isDark ? "#888" : "#666", lineHeight: 1.55 }}>
+              Passes soil moisture, temperature, humidity, and light through an AXI4-Lite Kalman filter on the FPGA. Returns a plant-health score, stress index, and alert level.
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", marginBottom: "1rem" }}>
+              {["Soil","Temp","Humidity","Light"].map(s => (
+                <span key={s} style={{ fontSize: "0.65rem", padding: "0.15rem 0.5rem", borderRadius: 9999, background: isDark ? "rgba(139,92,246,0.08)" : "rgba(139,92,246,0.07)", color: "#A78BFA", border: "1px solid rgba(139,92,246,0.25)" }}>{s}</span>
+              ))}
+            </div>
+            <ActionBtn label="Run Sensor Fusion" loadingLabel="Fusing on FPGA" loading={loadingFusion} onClick={runFusion} isDark={isDark} />
+          </div>
+
+          {/* Combined */}
+          <div style={{ borderRadius: 14, padding: "1.25rem 1.4rem", border: `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)"}`, background: isDark ? "rgba(12,16,20,0.88)" : "rgba(255,255,255,0.9)", backdropFilter: "blur(12px)" }}>
+            <p style={{ margin: "0 0 0.35rem", fontSize: "0.72rem", fontWeight: 700, color: isDark ? "#555" : "#BBB", textTransform: "uppercase", letterSpacing: "0.08em" }}>Pipeline 3</p>
+            <h3 style={{ margin: "0 0 0.5rem", fontSize: "1rem", fontWeight: 700, color: isDark ? "#E8E8E8" : "#111" }}>Full Irrigation Analysis</h3>
+            <p style={{ margin: "0 0 0.85rem", fontSize: "0.78rem", color: isDark ? "#888" : "#666", lineHeight: 1.55 }}>
+              Runs all three FPGA pipelines — fusion, rain prediction, and irrigation scheduling — in sequence. Groq LLM synthesises results into a concrete field action plan.
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", marginBottom: "1rem" }}>
+              {["All sensors","All models","Groq LLM"].map(s => (
+                <span key={s} style={{ fontSize: "0.65rem", padding: "0.15rem 0.5rem", borderRadius: 9999, background: isDark ? "rgba(46,204,113,0.08)" : "rgba(46,204,113,0.07)", color: "#2ECC71", border: "1px solid rgba(46,204,113,0.2)" }}>{s}</span>
+              ))}
+            </div>
+            <ActionBtn label="Run Full Analysis" loadingLabel="Running all pipelines" loading={loadingCombined} onClick={runCombined} isDark={isDark} />
           </div>
         </div>
 
-        {/* Control Buttons */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: "1.5rem",
-            marginBottom: "2rem",
-          }}
-        >
-          <GlassSection style={{ padding: "2rem", textAlign: "center" }}>
-            <CloudRain
-              style={{
-                width: "2rem",
-                height: "2rem",
-                color: "#2563EB",
-                margin: "0 auto 1rem",
-              }}
-            />
-            <h3
-              style={{
-                fontSize: "1.125rem",
-                fontWeight: "bold",
-                color: isDark ? "#FFFFFF" : "#1B3A20",
-                marginBottom: "1rem",
-              }}
-            >
-              Rain Predictor
-            </h3>
-            <Button
-              onClick={predictRain}
-              disabled={loadingRain}
-              style={{
-                width: "100%",
-                backgroundColor: "#2ECC71",
-                color: "white",
-                padding: "0.75rem",
-              }}
-            >
-              {loadingRain ? t("accel_sending") : t("accel_predict_rain")}
-            </Button>
-          </GlassSection>
-          <GlassSection style={{ padding: "2rem", textAlign: "center" }}>
-            <Leaf
-              style={{
-                width: "2rem",
-                height: "2rem",
-                color: "#27AE60",
-                margin: "0 auto 1rem",
-              }}
-            />
-            <h3
-              style={{
-                fontSize: "1.125rem",
-                fontWeight: "bold",
-                color: isDark ? "#FFFFFF" : "#1B3A20",
-                marginBottom: "1rem",
-              }}
-            >
-              Sensor Fusion
-            </h3>
-            <Button
-              onClick={runSensorFusion}
-              disabled={loadingFusion}
-              style={{
-                width: "100%",
-                backgroundColor: "#2ECC71",
-                color: "white",
-                padding: "0.75rem",
-              }}
-            >
-              {loadingFusion ? t("accel_sending") : t("accel_sensor_fusion")}
-            </Button>
-          </GlassSection>
-          <GlassSection style={{ padding: "2rem", textAlign: "center" }}>
-            <Droplets
-              style={{
-                width: "2rem",
-                height: "2rem",
-                color: "#8B5CF6",
-                margin: "0 auto 1rem",
-              }}
-            />
-            <h3
-              style={{
-                fontSize: "1.125rem",
-                fontWeight: "bold",
-                color: isDark ? "#FFFFFF" : "#1B3A20",
-                marginBottom: "1rem",
-              }}
-            >
-              Overall Analysis
-            </h3>
-            <Button
-              onClick={runCombinedAnalysis}
-              disabled={loadingCombined}
-              style={{
-                width: "100%",
-                backgroundColor: "#2ECC71",
-                color: "white",
-                padding: "0.75rem",
-              }}
-            >
-              {loadingCombined ? t("accel_sending") : t("accel_run_analysis")}
-            </Button>
-          </GlassSection>
-        </div>
-
-        {/* ─── Rain Prediction Results ─── */}
-        {rainPrediction && (
-          <GlassSection style={{ marginBottom: "1.5rem", padding: "2rem" }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "1.5rem",
-              }}
-            >
-              <h3
-                style={{
-                  fontSize: "1.25rem",
-                  fontWeight: "bold",
-                  color: isDark ? "#FFFFFF" : "#1B3A20",
-                }}
-              >
-                ️ Rain Prediction
-              </h3>
-              {modeBadge(rainPrediction.hardware_mode)}
+        {/* Results */}
+        {rainResult && (
+          <ResultCard title="Rain Prediction" modeLabel={rainResult.hardware_mode} isDark={isDark}>
+            <Bar value={rainResult.prediction.rain_probability} isDark={isDark} />
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "1rem" }}>
+              <Tile value={rainResult.prediction.rain_probability} unit="%" label="Rain probability" sub="FPGA random-forest output" isDark={isDark} />
+              {rainResult.prediction.confidence != null && <Tile value={rainResult.prediction.confidence} unit="%" label="Model confidence" sub="Calibrated classifier score" isDark={isDark} />}
+              {rainResult.processing_time_ms != null && <Tile value={rainResult.processing_time_ms} unit="ms" label="Inference time" sub={rainResult.hardware_mode === "real_hardware" ? "AXI4-Lite UART" : "Software sim"} isDark={isDark} />}
             </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "1.5rem",
-              }}
-            >
-              <div
-                style={{
-                  padding: "1.5rem",
-                  borderRadius: "0.5rem",
-                  backgroundColor: getRiskColor(
-                    rainPrediction.prediction.rain_probability
-                  ).bg,
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: "0.875rem",
-                    fontWeight: 600,
-                    color: "#374151",
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  Rain Probability
-                </p>
-                <p
-                  style={{
-                    fontSize: "2.25rem",
-                    fontWeight: "bold",
-                    color: getRiskColor(
-                      rainPrediction.prediction.rain_probability
-                    ).text,
-                  }}
-                >
-                  {rainPrediction.prediction.rain_probability}%
-                </p>
-              </div>
-              <div
-                style={{
-                  padding: "1.5rem",
-                  backgroundColor: isDark
-                    ? "rgba(46,204,113,0.1)"
-                    : "rgba(46,204,113,0.05)",
-                  borderRadius: "0.5rem",
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: "0.875rem",
-                    fontWeight: 600,
-                    color: isDark ? "#FFFFFF" : "#1B3A20",
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  Recommendation
-                </p>
-                <p
-                  style={{
-                    color: isDark ? "#FFFFFF" : "#1B3A20",
-                    fontSize: "0.95rem",
-                  }}
-                >
-                  {rainPrediction.farmer_recommendation}
-                </p>
-              </div>
-            </div>
-            {rainPrediction.ai_insights && (
-              <div
-                style={{
-                  marginTop: "1.5rem",
-                  padding: "1.5rem",
-                  backgroundColor: "rgba(99,102,241,0.1)",
-                  borderRadius: "0.5rem",
-                  borderLeft: "4px solid #6366F1",
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: "0.95rem",
-                    fontWeight: 700,
-                    color: isDark ? "#A5B4FC" : "#4F46E5",
-                    marginBottom: "0.75rem",
-                  }}
-                >
-                  {" "}
-                  LLM Analysis (Groq AI)
-                </p>
-                <p
-                  style={{
-                    color: isDark ? "#E5E7EB" : "#374151",
-                    fontSize: "0.9rem",
-                    lineHeight: 1.7,
-                    whiteSpace: "pre-line",
-                  }}
-                >
-                  {rainPrediction.ai_insights}
-                </p>
+            {rainResult.farmer_recommendation && (
+              <div style={{ marginTop: "1rem", padding: "0.9rem 1.1rem", borderRadius: 8, borderLeft: "2.5px solid #2ECC71", background: isDark ? "rgba(46,204,113,0.06)" : "rgba(46,204,113,0.04)" }}>
+                <p style={{ margin: "0 0 0.35rem", fontSize: "0.65rem", fontWeight: 700, color: "#2ECC71", textTransform: "uppercase", letterSpacing: "0.08em" }}>Recommendation</p>
+                <p style={{ margin: 0, fontSize: "0.82rem", color: isDark ? "#C0C0C0" : "#333", lineHeight: 1.6 }}>{rainResult.farmer_recommendation}</p>
               </div>
             )}
-          </GlassSection>
+            <HowBlock isDark={isDark} steps={[
+              `ESP32 readings collected — Temp: ${sensor.temperature}°C, Humidity: ${sensor.humidity}%, Pressure: ${sensor.pressure} hPa, Wind: ${sensor.wind_speed} km/h.`,
+              "Values sent via AXI4-Lite to the HLS random-forest core. Model trained on 5 years of Indian monsoon data with 42 decision trees.",
+              "Rain probability computed from the ensemble vote. Confidence = fraction of trees in agreement.",
+              "Groq LLM (llama-3.1-8b) receives the numeric output and generates plain-language field advice.",
+            ]} />
+            {rainResult.ai_insights && <LLMBlock text={rainResult.ai_insights} isDark={isDark} />}
+          </ResultCard>
         )}
 
-        {/* ─── Sensor Fusion Results ─── */}
-        {sensorFusion && (
-          <GlassSection style={{ marginBottom: "1.5rem", padding: "2rem" }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "1.5rem",
-              }}
-            >
-              <h3
-                style={{
-                  fontSize: "1.25rem",
-                  fontWeight: "bold",
-                  color: isDark ? "#FFFFFF" : "#1B3A20",
-                }}
-              >
-                Sensor Fusion Analysis
-              </h3>
-              {modeBadge(sensorFusion.hardware_mode)}
+        {fusionResult && (
+          <ResultCard title="Sensor Fusion" modeLabel={fusionResult.hardware_mode} isDark={isDark}>
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+              <Tile value={fusionResult.fpga_result?.fusion_score ?? "—"} label="Plant health score" sub="Kalman-fused composite (0–100)" isDark={isDark} />
+              <Tile value={fusionResult.fpga_result?.stress_index ?? "—"} unit="%" label="Stress index" sub="Deviation from optimal range" isDark={isDark} />
+              <Tile value={fusionResult.fpga_result?.alert_level ?? "Normal"} label="Alert level" sub="Threshold breach evaluation" isDark={isDark} />
             </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-                gap: "1.5rem",
-              }}
-            >
-              <div
-                style={{
-                  padding: "1.5rem",
-                  backgroundColor: isDark
-                    ? "rgba(46,204,113,0.1)"
-                    : "rgba(46,204,113,0.05)",
-                  borderRadius: "0.5rem",
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: "0.85rem",
-                    color: isDark ? "#E5E7EB" : "#1B3A20",
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  Plant Health Score
-                </p>
-                <p
-                  style={{
-                    fontSize: "1.75rem",
-                    fontWeight: "bold",
-                    color: "#2ECC71",
-                  }}
-                >
-                  {sensorFusion.fpga_result?.fusion_score ?? "N/A"}
-                </p>
-              </div>
-              <div
-                style={{
-                  padding: "1.5rem",
-                  backgroundColor: isDark
-                    ? "rgba(249,115,22,0.1)"
-                    : "rgba(249,115,22,0.05)",
-                  borderRadius: "0.5rem",
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: "0.85rem",
-                    color: isDark ? "#E5E7EB" : "#1B3A20",
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  Stress Level
-                </p>
-                <p
-                  style={{
-                    fontSize: "1.75rem",
-                    fontWeight: "bold",
-                    color: "#F97316",
-                  }}
-                >
-                  {sensorFusion.fpga_result?.stress_index ?? "N/A"}%
-                </p>
-              </div>
-              <div
-                style={{
-                  padding: "1.5rem",
-                  backgroundColor: isDark
-                    ? "rgba(59,130,246,0.1)"
-                    : "rgba(59,130,246,0.05)",
-                  borderRadius: "0.5rem",
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: "0.85rem",
-                    color: isDark ? "#E5E7EB" : "#1B3A20",
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  Alert Level
-                </p>
-                <p
-                  style={{
-                    fontSize: "1.75rem",
-                    fontWeight: "bold",
-                    color: "#3B82F6",
-                  }}
-                >
-                  {sensorFusion.fpga_result?.alert_level ?? "Normal"}
-                </p>
-              </div>
-            </div>
-            {sensorFusion.ai_insights && (
-              <div
-                style={{
-                  marginTop: "1.5rem",
-                  padding: "1.5rem",
-                  backgroundColor: "rgba(99,102,241,0.1)",
-                  borderRadius: "0.5rem",
-                  borderLeft: "4px solid #6366F1",
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: "0.95rem",
-                    fontWeight: 700,
-                    color: isDark ? "#A5B4FC" : "#4F46E5",
-                    marginBottom: "0.75rem",
-                  }}
-                >
-                  {" "}
-                  LLM Analysis (Groq AI)
-                </p>
-                <p
-                  style={{
-                    color: isDark ? "#E5E7EB" : "#374151",
-                    fontSize: "0.9rem",
-                    lineHeight: 1.7,
-                    whiteSpace: "pre-line",
-                  }}
-                >
-                  {sensorFusion.ai_insights}
-                </p>
+            {fusionResult.fpga_result?.stress_index != null && (
+              <div style={{ marginTop: "1rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.35rem" }}>
+                  <span style={{ fontSize: "0.7rem", color: isDark ? "#666" : "#999", fontWeight: 500 }}>Stress index</span>
+                  <span style={{ fontSize: "0.7rem", fontWeight: 700, color: fusionResult.fpga_result.stress_index > 60 ? "#ef4444" : fusionResult.fpga_result.stress_index > 40 ? "#f97316" : "#2ECC71" }}>
+                    {fusionResult.fpga_result.stress_index}%
+                  </span>
+                </div>
+                <div style={{ height: 5, borderRadius: 3, background: isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${fusionResult.fpga_result.stress_index}%`, borderRadius: 3, background: fusionResult.fpga_result.stress_index > 60 ? "#ef4444" : fusionResult.fpga_result.stress_index > 40 ? "#f97316" : "#2ECC71", transition: "width 0.7s ease" }} />
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.25rem" }}>
+                  <span style={{ fontSize: "0.6rem", color: "#2ECC71" }}>Healthy</span>
+                  <span style={{ fontSize: "0.6rem", color: "#ef4444" }}>Critical</span>
+                </div>
               </div>
             )}
-          </GlassSection>
+            <HowBlock isDark={isDark} steps={[
+              `Four sensor streams — Soil: ${sensor.soil_moisture}%, Temp: ${sensor.temperature}°C, Humidity: ${sensor.humidity}%, Light: ${sensor.light_level} lux — sent to FPGA via AXI4-Lite burst.`,
+              "Kalman filter on FPGA removes sensor noise, weights each channel by crop-type sensitivity coefficients.",
+              "Fusion score is a 0–100 composite where ≥80 = excellent, <40 = critical intervention needed.",
+              "Stress index = normalised deviation from the optimal range registered for the current crop type.",
+            ]} />
+            {fusionResult.ai_insights && <LLMBlock text={fusionResult.ai_insights} isDark={isDark} />}
+          </ResultCard>
         )}
 
-        {/* ─── Overall Analysis Results ─── */}
-        {combinedAnalysis && (
-          <GlassSection style={{ padding: "2rem" }}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "1.5rem",
-              }}
-            >
-              <h3
-                style={{
-                  fontSize: "1.25rem",
-                  fontWeight: "bold",
-                  color: isDark ? "#FFFFFF" : "#1B3A20",
-                }}
-              >
-                Overall Analysis
-              </h3>
-              {modeBadge(combinedAnalysis.hardware_mode)}
+        {combinedResult && (
+          <ResultCard title="Full Irrigation Analysis" modeLabel={combinedResult.hardware_mode} isDark={isDark}>
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+              <Tile value={combinedResult.combined_analysis?.overall_risk_level ?? "—"} label="Overall risk" sub="Aggregated pipeline output" isDark={isDark} />
+              <Tile value={combinedResult.combined_analysis?.stress_index ?? "—"} unit="%" label="Plant stress" sub="From Kalman fusion core" isDark={isDark} />
+              <Tile value={combinedResult.combined_analysis?.rain_probability ?? "—"} unit="%" label="Rain chance" sub="From rain predictor" isDark={isDark} />
             </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                gap: "1.5rem",
-                marginBottom: "1.5rem",
-              }}
-            >
-              <div
-                style={{
-                  padding: "1.5rem",
-                  backgroundColor: isDark
-                    ? "rgba(139,92,246,0.1)"
-                    : "rgba(139,92,246,0.05)",
-                  borderRadius: "0.5rem",
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: "0.85rem",
-                    color: isDark ? "#E5E7EB" : "#1B3A20",
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  Overall Risk
-                </p>
-                <p
-                  style={{
-                    fontSize: "1.5rem",
-                    fontWeight: "bold",
-                    color: "#8B5CF6",
-                  }}
-                >
-                  {combinedAnalysis.combined_analysis?.overall_risk_level ??
-                    "Low"}
-                </p>
-              </div>
-              <div
-                style={{
-                  padding: "1.5rem",
-                  backgroundColor: isDark
-                    ? "rgba(46,204,113,0.1)"
-                    : "rgba(46,204,113,0.05)",
-                  borderRadius: "0.5rem",
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: "0.85rem",
-                    color: isDark ? "#E5E7EB" : "#1B3A20",
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  Plant Stress
-                </p>
-                <p
-                  style={{
-                    fontSize: "1.5rem",
-                    fontWeight: "bold",
-                    color: "#2ECC71",
-                  }}
-                >
-                  {combinedAnalysis.combined_analysis?.stress_index ?? "N/A"}%
-                </p>
-              </div>
-              <div
-                style={{
-                  padding: "1.5rem",
-                  backgroundColor: isDark
-                    ? "rgba(59,130,246,0.1)"
-                    : "rgba(59,130,246,0.05)",
-                  borderRadius: "0.5rem",
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: "0.85rem",
-                    color: isDark ? "#E5E7EB" : "#1B3A20",
-                    marginBottom: "0.5rem",
-                  }}
-                >
-                  Rain Chance
-                </p>
-                <p
-                  style={{
-                    fontSize: "1.5rem",
-                    fontWeight: "bold",
-                    color: "#3B82F6",
-                  }}
-                >
-                  {combinedAnalysis.combined_analysis?.rain_probability ??
-                    "N/A"}
-                  %
-                </p>
-              </div>
-            </div>
-            <div
-              style={{
-                padding: "2rem",
-                backgroundColor: isDark
-                  ? "rgba(46,204,113,0.15)"
-                  : "rgba(46,204,113,0.08)",
-                borderRadius: "0.5rem",
-                borderLeft: "4px solid #2ECC71",
-              }}
-            >
-              <p
-                style={{
-                  fontSize: "1.1rem",
-                  fontWeight: 700,
-                  color: isDark ? "#E5E7EB" : "#1B3A20",
-                  marginBottom: "1rem",
-                }}
-              >
-                {" "}
-                What You Should Do Now:
-              </p>
-              <p
-                style={{
-                  color: isDark ? "#F3F4F6" : "#374151",
-                  fontSize: "1rem",
-                  lineHeight: 1.6,
-                }}
-              >
-                {combinedAnalysis.combined_analysis?.recommendation}
-              </p>
-            </div>
-            {combinedAnalysis.ai_enhancement && (
-              <div
-                style={{
-                  marginTop: "1.5rem",
-                  padding: "1.5rem",
-                  backgroundColor: "rgba(99,102,241,0.1)",
-                  borderRadius: "0.5rem",
-                  borderLeft: "4px solid #6366F1",
-                }}
-              >
-                <p
-                  style={{
-                    fontSize: "0.95rem",
-                    fontWeight: 700,
-                    color: isDark ? "#A5B4FC" : "#4F46E5",
-                    marginBottom: "0.75rem",
-                  }}
-                >
-                  {" "}
-                  LLM Deep Analysis (Groq AI)
-                </p>
-                <p
-                  style={{
-                    color: isDark ? "#E5E7EB" : "#374151",
-                    fontSize: "0.9rem",
-                    lineHeight: 1.7,
-                    whiteSpace: "pre-line",
-                  }}
-                >
-                  {combinedAnalysis.ai_enhancement}
-                </p>
+            {combinedResult.combined_analysis?.recommendation && (
+              <div style={{ marginTop: "1rem", padding: "1rem 1.25rem", borderRadius: 8, borderLeft: "2.5px solid #2ECC71", background: isDark ? "rgba(46,204,113,0.06)" : "rgba(46,204,113,0.04)" }}>
+                <p style={{ margin: "0 0 0.35rem", fontSize: "0.65rem", fontWeight: 700, color: "#2ECC71", textTransform: "uppercase", letterSpacing: "0.08em" }}>Field action</p>
+                <p style={{ margin: 0, fontSize: "0.85rem", color: isDark ? "#C8C8C8" : "#222", lineHeight: 1.65 }}>{combinedResult.combined_analysis.recommendation}</p>
               </div>
             )}
-          </GlassSection>
+            <HowBlock isDark={isDark} steps={[
+              "All five sensor channels (12 data points) sent to FPGA in a single AXI burst transaction.",
+              "Three HLS accelerator cores run: Kalman fusion, rain forest classifier, and irrigation scheduler.",
+              "Results merged into a risk matrix — soil deficit × rain probability × crop growth stage.",
+              "Groq LLM receives the full matrix and outputs a time-specific irrigation plan.",
+            ]} />
+            {combinedResult.ai_enhancement && <LLMBlock text={combinedResult.ai_enhancement} isDark={isDark} />}
+          </ResultCard>
         )}
+
       </div>
     </div>
   );

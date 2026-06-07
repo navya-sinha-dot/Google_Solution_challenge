@@ -11,7 +11,7 @@ export async function getGeminiResponse(prompt: string, contextData?: any) {
         console.log(`SkyView AI: Dispatching atmospheric query to backend...`);
 
         // Use the local FastAPI backend instead of direct client-side Gemini
-        const backendUrl = import.meta.env.VITE_API_BASE_URL || 'https://agentic-backend-lyx3.onrender.com';
+        const backendUrl = import.meta.env.VITE_API_URL || '';
 
         const response = await fetch(`${backendUrl}/api/chat`, {
             method: 'POST',

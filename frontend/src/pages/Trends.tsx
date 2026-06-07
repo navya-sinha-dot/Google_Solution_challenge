@@ -11,7 +11,7 @@ import { Thermometer, Droplets, CloudRain, RefreshCw, TrendingUp, TrendingDown, 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from 'next-themes';
 
-const API_URL = import.meta.env.VITE_API_URL || import.meta.env.REACT_APP_API_URL || 'https://agentic-backend-lyx3.onrender.com';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 interface HistoricalDataPoint {
   time: string;
