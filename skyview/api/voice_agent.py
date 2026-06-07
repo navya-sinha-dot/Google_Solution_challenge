@@ -276,8 +276,9 @@ async def _orchestrate(message: str, language: str, phone: str | None, station_i
     for tool in tools_to_run:
         if tool not in TOOLS and tool not in {"fetch_profile", "fetch_weather"}:
             continue
-        yield (tool, None)
-        tool_results[tool] = await _run_tool(tool, payload, phone, station_id)
+        res = await _run_tool(tool, payload, phone, station_id)
+        tool_results[tool] = res
+        yield (tool, res)
         await asyncio.sleep(0.05)
 
     yield ("final_response", None)
@@ -317,6 +318,7 @@ async def voice_agent(req: VoiceAgentRequest):
                             "type": "step",
                             "process": process,
                             "label": PROCESS_LABELS.get(process, process),
+                            "data": value,
                         },
                         ensure_ascii=False,
                     ) + "\n"
@@ -328,12 +330,17 @@ async def voice_agent(req: VoiceAgentRequest):
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
-    steps: list[dict[str, str]] = []
+    steps: list[dict[str, Any]] = []
     final_response = ""
     async for process, value in _orchestrate(message, req.language, req.phone, req.station_id):
         if process == "__done__":
             final_response = value or ""
         else:
-            steps.append({"process": process, "label": PROCESS_LABELS.get(process, process)})
+            steps.append({
+                "process": process,
+                "label": PROCESS_LABELS.get(process, process),
+                "data": value,
+            })
 
     return JSONResponse({"steps": steps, "response": final_response, "transcript": message})
+

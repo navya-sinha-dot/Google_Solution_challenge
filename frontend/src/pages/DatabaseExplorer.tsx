@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { FarmBackground, GlassSection } from '@/components/FarmTheme';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
   RefreshCw,
   Download,
@@ -23,24 +24,6 @@ import {
 } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
-
-const CACHE_TTL_TABLES  = 30_000;
-const CACHE_TTL_RECORDS = 15_000;
-
-function cacheSet(key: string, value: unknown, ttl: number) {
-  try {
-    localStorage.setItem(key, JSON.stringify({ v: value, exp: Date.now() + ttl }));
-  } catch { /* quota exceeded */ }
-}
-
-function cacheGet<T>(key: string): { fresh: T } | { stale: T } | null {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const { v, exp } = JSON.parse(raw) as { v: T; exp: number };
-    return Date.now() < exp ? { fresh: v } : { stale: v };
-  } catch { return null; }
-}
 
 type ColumnMeta = {
   name: string;
@@ -166,14 +149,7 @@ export default function DatabaseExplorer() {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
-  const [tables, setTables] = useState<TableMeta[]>([]);
   const [selectedTable, setSelectedTable] = useState('');
-  const [columns, setColumns] = useState<ColumnMeta[]>([]);
-  const [records, setRecords] = useState<Record<string, unknown>[]>([]);
-  const [pagination, setPagination] = useState({ page: 1, page_size: 50, total_rows: 0, total_pages: 1 });
-  const [loadingTables, setLoadingTables] = useState(true);
-  const [loadingRecords, setLoadingRecords] = useState(false);
-  const [error, setError] = useState('');
   const [tableSearch, setTableSearch] = useState('');
   const [rowSearch, setRowSearch] = useState('');
   const [filterColumn, setFilterColumn] = useState('');
@@ -183,8 +159,55 @@ export default function DatabaseExplorer() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const [viewMode, setViewMode] = useState<'table' | 'json' | 'query'>('table');
-  const [lastRefresh, setLastRefresh] = useState('');
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
+
+  const { data: tables = [], isLoading: loadingTables, error: tablesError, refetch: refetchTables } = useQuery({
+    queryKey: ['dbTables'],
+    queryFn: async () => {
+      const res = await fetch(`${API_URL}/admin/tables`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      return normalizeTables(data);
+    },
+    staleTime: 30000,
+  });
+
+  const {
+    data: tableData = { columns: [], records: [], pagination: { page: 1, page_size: 50, total_rows: 0, total_pages: 1 } },
+    isLoading: loadingRecords,
+    isFetching: isFetchingTableData,
+    error: recordsError,
+    refetch: refetchTableData,
+    dataUpdatedAt: recordsUpdatedAt,
+  } = useQuery({
+    queryKey: ['dbTableData', selectedTable, page, pageSize, rowSearch, filterColumn, filterValue, orderBy, sortDesc],
+    queryFn: async () => {
+      if (!selectedTable) return { columns: [], records: [], pagination: { page: 1, page_size: 50, total_rows: 0, total_pages: 1 } };
+      const params = new URLSearchParams();
+      params.set('page', String(page));
+      params.set('page_size', String(pageSize));
+      params.set('desc', String(sortDesc));
+      if (orderBy) params.set('order_by', orderBy);
+      if (rowSearch.trim()) params.set('search', rowSearch.trim());
+      if (filterColumn && filterValue.trim()) {
+        params.set('filter_column', filterColumn);
+        params.set('filter_value', filterValue.trim());
+      }
+      const res = await fetch(`${API_URL}/admin/tables/${encodeURIComponent(selectedTable)}?${params.toString()}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      return normalizeTableResponse(data, page, pageSize);
+    },
+    enabled: !!selectedTable,
+    placeholderData: keepPreviousData,
+    staleTime: 15000,
+  });
+
+  const columns = tableData.columns;
+  const records = tableData.records;
+  const pagination = tableData.pagination;
+  const lastRefresh = recordsUpdatedAt ? new Date(recordsUpdatedAt).toLocaleTimeString() : '';
+  const error = (tablesError || recordsError) ? (((tablesError as Error)?.message || '') + ' ' + ((recordsError as Error)?.message || '')).trim() : '';
 
   const selectedTableMeta = useMemo(() => tables.find((t) => t.name === selectedTable), [tables, selectedTable]);
 
@@ -209,79 +232,6 @@ export default function DatabaseExplorer() {
     return `GET /admin/tables/${selectedTable}?${params.toString()}`;
   }, [filterColumn, filterValue, orderBy, page, pageSize, rowSearch, selectedTable, sortDesc]);
 
-  const loadTables = async () => {
-    setLoadingTables(true);
-    setError('');
-    const cached = cacheGet<TableMeta[]>('db:tables');
-    if (cached) {
-      const list = normalizeTables({ tables: 'fresh' in cached ? cached.fresh : cached.stale });
-      setTables(list);
-      if (!selectedTable && list.length > 0) setSelectedTable(list[0].name);
-      if ('fresh' in cached) { setLoadingTables(false); return; }
-    }
-    try {
-      const res = await fetch(`${API_URL}/admin/tables`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const list = normalizeTables(data);
-      cacheSet('db:tables', list, CACHE_TTL_TABLES);
-      setTables(list);
-      if (!selectedTable && list.length > 0) setSelectedTable(list[0].name);
-      setLastRefresh(new Date().toLocaleTimeString());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load tables');
-    } finally {
-      setLoadingTables(false);
-    }
-  };
-
-  const loadTableData = async () => {
-    if (!selectedTable) return;
-    setLoadingRecords(true);
-    setError('');
-    const params = new URLSearchParams();
-    params.set('page', String(page));
-    params.set('page_size', String(pageSize));
-    params.set('desc', String(sortDesc));
-    if (orderBy) params.set('order_by', orderBy);
-    if (rowSearch.trim()) params.set('search', rowSearch.trim());
-    if (filterColumn && filterValue.trim()) {
-      params.set('filter_column', filterColumn);
-      params.set('filter_value', filterValue.trim());
-    }
-    const cacheKey = `db:${selectedTable}:${params.toString()}`;
-    const cached = cacheGet<TableResponse>(cacheKey);
-    if (cached) {
-      const data = normalizeTableResponse('fresh' in cached ? cached.fresh : cached.stale, page, pageSize);
-      setColumns(data.columns || []);
-      setRecords(data.records || []);
-      setPagination(data.pagination || { page, page_size: pageSize, total_rows: 0, total_pages: 1 });
-      if ('fresh' in cached) { setLoadingRecords(false); return; }
-    }
-    try {
-      const res = await fetch(`${API_URL}/admin/tables/${encodeURIComponent(selectedTable)}?${params.toString()}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = normalizeTableResponse(await res.json(), page, pageSize);
-      cacheSet(cacheKey, data, CACHE_TTL_RECORDS);
-      setColumns(data.columns || []);
-      setRecords(data.records || []);
-      setPagination(data.pagination || { page, page_size: pageSize, total_rows: 0, total_pages: 1 });
-      if (!orderBy && data.columns?.length > 0) {
-        const primary = data.columns.find((c) => c.primary_key)?.name || data.columns[0].name;
-        setOrderBy(primary);
-      }
-      setLastRefresh(new Date().toLocaleTimeString());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load table data');
-      setRecords([]);
-      setColumns([]);
-    } finally {
-      setLoadingRecords(false);
-    }
-  };
-
-  useEffect(() => { loadTables(); }, []);
-
   useEffect(() => {
     if (!selectedTable && visibleTables.length > 0) setSelectedTable(visibleTables[0].name);
   }, [selectedTable, visibleTables]);
@@ -295,11 +245,16 @@ export default function DatabaseExplorer() {
   }, [selectedTable]);
 
   useEffect(() => {
-    if (!selectedTable) return;
-    loadTableData();
-  }, [selectedTable, page, pageSize, rowSearch, filterColumn, filterValue, orderBy, sortDesc]);
+    if (!orderBy && columns && columns.length > 0) {
+      const primary = columns.find((c) => c.primary_key)?.name || columns[0].name;
+      setOrderBy(primary);
+    }
+  }, [columns, orderBy]);
 
-  const refreshAll = async () => { await loadTables(); await loadTableData(); };
+  const refreshAll = async () => {
+    refetchTables();
+    refetchTableData();
+  };
 
   const exportCurrentTable = () => {
     if (!selectedTable) return;
@@ -424,6 +379,27 @@ export default function DatabaseExplorer() {
             </span>
             {lastRefresh && (
               <span style={{ fontSize: 11, color: textDim, fontFamily: mono }}>· {lastRefresh}</span>
+            )}
+            {isFetchingTableData && !loadingRecords && (
+              <span style={{
+                fontSize: 11,
+                color: '#10B981',
+                fontFamily: mono,
+                marginLeft: 8,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4
+              }}>
+                <span style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: '#10B981',
+                  display: 'inline-block',
+                  animation: 'pulse 1.5s infinite'
+                }} />
+                Updating…
+              </span>
             )}
           </div>
 
@@ -561,7 +537,10 @@ export default function DatabaseExplorer() {
                       </button>
                     ))}
                   </div>
-                  <button onClick={refreshAll} style={btnDefault}><RefreshCw size={11} /> Refresh</button>
+                  <button onClick={refreshAll} style={btnDefault}>
+                    <RefreshCw size={11} style={{ animation: isFetchingTableData ? 'spin 1s linear infinite' : 'none' }} />
+                    Refresh
+                  </button>
                   <button onClick={exportCurrentTable} style={btnDefault}><Download size={11} /> Export</button>
                 </div>
               </div>
@@ -815,23 +794,23 @@ export default function DatabaseExplorer() {
               </span>
               <div style={{ display: 'flex', gap: 4 }}>
                 <button
-                  disabled={pagination.page <= 1 || loadingRecords}
+                  disabled={pagination.page <= 1 || isFetchingTableData}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   style={{
                     ...btnDefault,
-                    opacity: pagination.page <= 1 || loadingRecords ? 0.3 : 1,
-                    cursor: pagination.page <= 1 || loadingRecords ? 'not-allowed' : 'pointer',
+                    opacity: pagination.page <= 1 || isFetchingTableData ? 0.3 : 1,
+                    cursor: pagination.page <= 1 || isFetchingTableData ? 'not-allowed' : 'pointer',
                   }}
                 >
                   <ChevronLeft size={11} /> Prev
                 </button>
                 <button
-                  disabled={pagination.page >= pagination.total_pages || loadingRecords}
+                  disabled={pagination.page >= pagination.total_pages || isFetchingTableData}
                   onClick={() => setPage((p) => Math.min(pagination.total_pages, p + 1))}
                   style={{
                     ...btnDefault,
-                    opacity: pagination.page >= pagination.total_pages || loadingRecords ? 0.3 : 1,
-                    cursor: pagination.page >= pagination.total_pages || loadingRecords ? 'not-allowed' : 'pointer',
+                    opacity: pagination.page >= pagination.total_pages || isFetchingTableData ? 0.3 : 1,
+                    cursor: pagination.page >= pagination.total_pages || isFetchingTableData ? 'not-allowed' : 'pointer',
                   }}
                 >
                   Next <ChevronRight size={11} />
@@ -944,6 +923,16 @@ export default function DatabaseExplorer() {
           </div>
         </div>
       </main>
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.4; }
+        }
+      `}</style>
     </div>
   );
 }

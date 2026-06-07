@@ -1,74 +1,350 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { FarmBackground } from "@/components/FarmTheme";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { UserCircle, MapPin, LayoutGrid, Wheat, ShieldCheck, ExternalLink, Loader2, Pencil, Check, X, Cpu, Wifi, WifiOff, ShoppingCart } from "lucide-react";
+import {
+  UserCircle, MapPin, LayoutGrid, Wheat, ShieldCheck,
+  ExternalLink, Loader2, Pencil, Check, X, Cpu,
+  Wifi, WifiOff, ShoppingCart, PhoneCall, Mail, Home, Activity,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTheme } from "next-themes";
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
+// ─── Shared design tokens (same as MandiRates / Trends) ──────────────────────
+const css = {
+  card: (isDark: boolean) => ({
+    background: isDark ? 'rgba(15,28,18,0.85)' : 'rgba(255,255,255,0.92)',
+    border: `1px solid ${isDark ? 'rgba(46,204,113,0.12)' : 'rgba(30,100,50,0.1)'}`,
+    borderRadius: '16px',
+    backdropFilter: 'blur(16px)',
+  } as React.CSSProperties),
+  text: {
+    primary:   (isDark: boolean) => isDark ? '#D4EDDA' : '#142A1A',
+    secondary: (isDark: boolean) => isDark ? '#5A8A6A' : '#4D7060',
+    accent:  '#2ECC71',
+    danger:  '#EF4444',
+    info:    '#3B82F6',
+    warning: '#F59E0B',
+  },
+};
+
+// ─── Reusable primitives ──────────────────────────────────────────────────────
+function Badge({ label, color, bg }: { label: string; color: string; bg: string }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      background: bg, color, padding: '3px 10px',
+      borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: '0.02em',
+      whiteSpace: 'nowrap',
+    }}>
+      {label}
+    </span>
+  );
+}
+
+function PrimaryBtn({
+  onClick, disabled, children, danger, outline,
+}: {
+  onClick?: () => void; disabled?: boolean;
+  children: React.ReactNode; danger?: boolean; outline?: boolean;
+}) {
+  const bg = outline
+    ? 'transparent'
+    : danger
+      ? '#EF4444'
+      : '#2ECC71';
+  const color = outline
+    ? (danger ? '#EF4444' : '#2ECC71')
+    : '#fff';
+  const border = outline
+    ? `1px solid ${danger ? '#EF4444' : '#2ECC71'}`
+    : 'none';
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+        padding: '0 20px', height: 44, borderRadius: 12, border,
+        background: bg, color, cursor: disabled ? 'not-allowed' : 'pointer',
+        fontWeight: 700, fontSize: 14, transition: 'all 0.18s',
+        opacity: disabled ? 0.65 : 1, width: '100%',
+        boxShadow: (!outline && !disabled) ? `0 2px 10px ${danger ? 'rgba(239,68,68,0.25)' : 'rgba(46,204,113,0.25)'}` : 'none',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function StatCard({ label, value, icon, accentColor, isDark }: {
+  label: string; value: string | number;
+  icon: React.ReactNode; accentColor: string; isDark: boolean;
+}) {
+  return (
+    <div style={{ ...css.card(isDark), padding: '18px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div style={{
+        width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+        background: `${accentColor}18`, color: accentColor,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        {icon}
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <p style={{ fontSize: 12, color: css.text.secondary(isDark), fontWeight: 600, margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</p>
+        <p style={{ fontSize: 18, fontWeight: 800, color: css.text.primary(isDark), margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value || '—'}</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Field row (view mode) ────────────────────────────────────────────────────
+function FieldRow({ label, icon, value, onAdd, isDark }: {
+  label: string; icon: React.ReactNode;
+  value: string; onAdd?: () => void; isDark: boolean;
+}) {
+  const textPrimary   = css.text.primary(isDark);
+  const textSecondary = css.text.secondary(isDark);
+  const borderColor   = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)';
+  return (
+    <div style={{ padding: '10px 0', borderBottom: `1px solid ${borderColor}` }}>
+      <p style={{ fontSize: 10, color: textSecondary, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 5px' }}>{label}</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ color: css.text.accent, flexShrink: 0 }}>{icon}</span>
+        {value
+          ? <span style={{ fontSize: 14, fontWeight: 700, color: textPrimary }}>{value}</span>
+          : <span
+              onClick={onAdd}
+              style={{ fontSize: 13, color: textSecondary, fontStyle: 'italic', cursor: 'pointer' }}
+            >Tap to add…</span>
+        }
+      </div>
+    </div>
+  );
+}
+
+// ─── Field input (edit mode) ──────────────────────────────────────────────────
+function FieldInput({ label, value, onChange, placeholder, isDark }: {
+  label: string; value: string;
+  onChange: (v: string) => void; placeholder: string; isDark: boolean;
+}) {
+  const borderColor = isDark ? 'rgba(46,204,113,0.14)' : 'rgba(30,100,50,0.12)';
+  const bg          = isDark ? 'rgba(255,255,255,0.06)' : '#FFFFFF';
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <p style={{ fontSize: 10, color: css.text.secondary(isDark), fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 5px' }}>{label}</p>
+      <input
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          width: '100%', padding: '10px 14px', borderRadius: 10,
+          border: `1px solid ${borderColor}`, background: bg,
+          color: css.text.primary(isDark), fontSize: 14, outline: 'none',
+          boxSizing: 'border-box',
+        }}
+      />
+    </div>
+  );
+}
+
+// ─── Scheme card ──────────────────────────────────────────────────────────────
+function SchemeCard({ scheme, isMatch, index, isDark }: {
+  scheme: any; isMatch: boolean; index: number; isDark: boolean;
+}) {
+  const textPrimary   = css.text.primary(isDark);
+  const textSecondary = css.text.secondary(isDark);
+  const borderColor   = isMatch
+    ? (isDark ? 'rgba(46,204,113,0.28)' : 'rgba(46,204,113,0.35)')
+    : (isDark ? 'rgba(46,204,113,0.12)' : 'rgba(30,100,50,0.1)');
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.05 * index, duration: 0.4 }}
+    >
+      <div style={{
+        ...css.card(isDark),
+        border: `1px solid ${borderColor}`,
+        padding: '22px 24px',
+        position: 'relative',
+        overflow: 'hidden',
+        background: isMatch
+          ? (isDark ? 'rgba(46,204,113,0.06)' : 'rgba(46,204,113,0.03)')
+          : css.card(isDark).background,
+      }}>
+        {/* Local match ribbon */}
+        {isMatch && (
+          <div style={{
+            position: 'absolute', top: 0, right: 0,
+            background: '#2ECC71', color: '#fff',
+            fontSize: 10, fontWeight: 800, letterSpacing: '0.06em',
+            textTransform: 'uppercase', padding: '4px 12px',
+            borderBottomLeftRadius: 10,
+          }}>
+            Local Match
+          </div>
+        )}
+
+        {/* Badges row */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+          <Badge
+            label={scheme.state || 'All India'}
+            color={isMatch ? '#2ECC71' : css.text.info}
+            bg={isMatch ? 'rgba(46,204,113,0.12)' : 'rgba(59,130,246,0.12)'}
+          />
+          {scheme.scheme_type && (
+            <Badge
+              label={String(scheme.scheme_type).replace(/_/g, ' ')}
+              color={textSecondary}
+              bg={isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'}
+            />
+          )}
+          {scheme.status && (
+            <Badge
+              label={scheme.status}
+              color='#2ECC71'
+              bg='rgba(46,204,113,0.1)'
+            />
+          )}
+        </div>
+
+        {/* Name */}
+        <h3 style={{ fontSize: 18, fontWeight: 800, color: textPrimary, margin: '0 0 8px', paddingRight: isMatch ? 80 : 0, fontFamily: "'Nunito', sans-serif" }}>
+          {scheme.scheme_name}
+        </h3>
+
+        {/* Description */}
+        <p style={{ fontSize: 13, color: textSecondary, lineHeight: 1.6, margin: '0 0 16px' }}>
+          {scheme.benefit_description || scheme.description}
+        </p>
+
+        {/* Info grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 16px', marginBottom: 16 }}>
+          {scheme.applicable_crops && (
+            <div>
+              <p style={{ fontSize: 9, color: textSecondary, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 3px' }}>Crops</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <Wheat size={13} color='#2ECC71' style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: textPrimary }}>{scheme.applicable_crops}</span>
+              </div>
+            </div>
+          )}
+          {scheme.eligibility && (
+            <div>
+              <p style={{ fontSize: 9, color: textSecondary, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', margin: '0 0 3px' }}>Eligibility</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <ShieldCheck size={13} color='#2ECC71' style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: textPrimary }}>{scheme.eligibility}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Contact strip */}
+        {(scheme.helpline || scheme.email || scheme.contact_address) && (
+          <div style={{
+            padding: '12px 0 12px',
+            borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}`,
+            marginBottom: 14,
+          }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 20px', marginBottom: scheme.contact_address ? 8 : 0 }}>
+              {scheme.helpline && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: textSecondary, fontWeight: 600 }}>
+                  <PhoneCall size={13} color='#2ECC71' />
+                  Call: {scheme.helpline}
+                </div>
+              )}
+              {scheme.email && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: textSecondary, fontWeight: 600 }}>
+                  <Mail size={13} color='#2ECC71' />
+                  {scheme.email}
+                </div>
+              )}
+            </div>
+            {scheme.contact_address && (
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 5, fontSize: 11, color: textSecondary }}>
+                <Home size={12} color='#2ECC71' style={{ flexShrink: 0, marginTop: 2 }} />
+                {scheme.contact_address}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Apply button */}
+        <PrimaryBtn onClick={() => window.open(scheme.official_url || scheme.link, '_blank')}>
+          <ExternalLink size={15} /> Apply Now
+        </PrimaryBtn>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── LOCAL SCHEMES FALLBACK ───────────────────────────────────────────────────
 const LOCAL_SCHEMES = [
-  {
-    scheme_name: "PM-Kisan Samman Nidhi",
-    description: "Direct income support of ₹6,000 per year in three instalments to all landholding farmer families.",
-    required_docs: ["Aadhar Card", "Bank Passbook", "Land Ownership Proof"],
-    link: "https://pmkisan.gov.in/",
-    source: "Government Scheme",
-  },
-  {
-    scheme_name: "Pradhan Mantri Fasal Bima Yojana (PMFBY)",
-    description: "Financial support to farmers suffering crop loss or damage due to natural calamities, pests and diseases.",
-    required_docs: ["Aadhar Card", "Sowing Certificate", "Bank Passbook"],
-    link: "https://pmfby.gov.in/",
-    source: "Government Scheme",
-  },
-  {
-    scheme_name: "Soil Health Card Scheme",
-    description: "Helps farmers understand the nutrient status of their soil and use fertilizers judiciously to reduce costs.",
-    required_docs: ["Aadhar Card", "Soil Sample Collection Report"],
-    link: "https://soilhealth.dac.gov.in/",
-    source: "Government Scheme",
-  },
-  {
-    scheme_name: "Kisan Credit Card (KCC)",
-    description: "Provides farmers with timely and adequate credit for cultivation needs and short-term credit requirements.",
-    required_docs: ["Aadhar Card", "Land Records", "Passport Size Photograph"],
-    link: "https://www.myscheme.gov.in/schemes/kcc",
-    source: "Government Scheme",
-  },
-  {
-    scheme_name: "Paramparagat Krishi Vikas Yojana (PKVY)",
-    description: "Promotes organic farming through a cluster approach and PGS certification to improve soil health.",
-    required_docs: ["Aadhar Card", "Cluster Registration Proof"],
-    link: "https://pgsindia-ncof.dac.gov.in/pkvy/",
-    source: "Government Scheme",
-  },
-  {
-    scheme_name: "National Mission for Sustainable Agriculture (NMSA)",
-    description: "Promotes sustainable agriculture through climate-resilient practices and resource conservation technologies.",
-    required_docs: ["Aadhar Card", "Soil Health Card", "Bank Passbook"],
-    link: "https://nmsa.dac.gov.in/",
-    source: "Government Scheme",
-  },
+  { scheme_id: "pm_kisan", scheme_name: "PM-Kisan Samman Nidhi", scheme_type: "income_support", state: "India", applicable_crops: "All eligible crops", benefit_description: "Direct income support of Rs. 6,000 per year in three equal instalments to all landholding farmer families.", eligibility: "Landholding farmer family", status: "Active", official_url: "https://pmkisan.gov.in/", helpline: "155261", email: "pmkisan-ict@gov.in", contact_address: "Department of Agriculture & Farmers Welfare, Government of India" },
+  { scheme_id: "pmfby", scheme_name: "Pradhan Mantri Fasal Bima Yojana (PMFBY)", scheme_type: "insurance", state: "India", applicable_crops: "All notified crops", benefit_description: "Financial support to farmers suffering crop loss or damage due to natural calamities, pests and diseases.", eligibility: "Insured farmer sowing notified crops in notified areas", status: "Active", official_url: "https://pmfby.gov.in/", helpline: "14447", email: "helpdesk-pmfby@gov.in", contact_address: "Pradhan Mantri Fasal Bima Yojana portal" },
+  { scheme_id: "soil_health_card", scheme_name: "Soil Health Card Scheme", scheme_type: "soil_management", state: "India", applicable_crops: "All crops", benefit_description: "Helps farmers understand the nutrient status of their soil and use fertilizers judiciously to reduce costs.", eligibility: "All farmers owning cultivable land", status: "Active", official_url: "https://soilhealth.dac.gov.in/", helpline: "1800-180-1551", email: "support@soilhealth.gov.in", contact_address: "Department of Agriculture & Farmers Welfare, Government of India" },
+  { scheme_id: "kcc", scheme_name: "Kisan Credit Card (KCC)", scheme_type: "credit", state: "India", applicable_crops: "All crops", benefit_description: "Provides farmers with timely and adequate credit for cultivation needs and short-term credit requirements.", eligibility: "Eligible farmer, tenant farmer, sharecropper", status: "Active", official_url: "https://www.myscheme.gov.in/schemes/kcc", helpline: "1800-11-0034", email: "support@myscheme.gov.in", contact_address: "MyScheme portal" },
+  { scheme_id: "pkvy", scheme_name: "Paramparagat Krishi Vikas Yojana (PKVY)", scheme_type: "organic_farming", state: "India", applicable_crops: "Organic clusters", benefit_description: "Promotes organic farming through a cluster approach and PGS certification to improve soil health.", eligibility: "Organic farming cluster members", status: "Active", official_url: "https://pgsindia-ncof.dac.gov.in/pkvy/", helpline: "1800-180-1551", email: "pkvy-support@gov.in", contact_address: "National Centre of Organic Farming, Government of India" },
 ];
 
+// ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 export default function Profile() {
-  const [profileData, setProfileData] = useState({
-    name: "",
-    land_size_acres: "",
-    crops: [] as string[],
-    location: ""
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+
+  const textPrimary   = css.text.primary(isDark);
+  const textSecondary = css.text.secondary(isDark);
+  const borderColor   = isDark ? 'rgba(46,204,113,0.12)' : 'rgba(30,100,50,0.1)';
+
+  const queryClient = useQueryClient();
+  const phone = localStorage.getItem("user_phone") || "";
+
+  const cachedProfile = {
+    name:            localStorage.getItem("user_name") || "",
+    land_size_acres: localStorage.getItem("user_land_size") || "",
+    location:        localStorage.getItem("user_location") || "",
+    crops:           localStorage.getItem("user_crops")
+      ? localStorage.getItem("user_crops")!.split(",").map(c => c.trim()).filter(Boolean)
+      : [],
+  };
+
+  const { data: profileData = cachedProfile } = useQuery({
+    queryKey: ['profile', phone],
+    queryFn: async () => {
+      if (!phone) return cachedProfile;
+      const res = await fetch(`${API_URL}/api/profile?phone=${encodeURIComponent(phone)}`);
+      if (!res.ok) return cachedProfile;
+      const data = await res.json();
+      if (data.status === "success" && data.profile) {
+        const p = data.profile;
+        const cropsList = p.crops?.length
+          ? p.crops
+          : (localStorage.getItem("user_crops") || "").split(",").map((c: string) => c.trim()).filter(Boolean);
+        if (p.name)            localStorage.setItem("user_name", p.name);
+        if (p.land_size_acres) localStorage.setItem("user_land_size", String(p.land_size_acres));
+        if (p.location)        localStorage.setItem("user_location", p.location);
+        if (cropsList?.length) localStorage.setItem("user_crops", cropsList.join(", "));
+        return { name: p.name || "", land_size_acres: String(p.land_size_acres || ""), location: p.location || "", crops: cropsList };
+      }
+      return cachedProfile;
+    },
+    enabled: !!phone,
+    initialData: cachedProfile,
   });
-  const [editing, setEditing] = useState(false);
+
+  const [editing, setEditing]   = useState(false);
   const [editForm, setEditForm] = useState({ name: "", land_size_acres: "", location: "", crops: "" });
-  const [saving, setSaving] = useState(false);
-  const [schemes, setSchemes] = useState<any[]>([]);
-  const [schemesLoading, setSchemesLoading] = useState(true);
+  const [saving, setSaving]     = useState(false);
   const [hwConnecting, setHwConnecting] = useState(false);
   const { toast } = useToast();
   const { t } = useLanguage();
@@ -83,372 +359,297 @@ export default function Profile() {
     toast({ title: "Hardware Connected", description: "AgriSense WS01 is now paired to your account." });
   };
 
-  useEffect(() => {
-    // Show local schemes immediately
-    setSchemes(LOCAL_SCHEMES);
-
-    // Load cached profile from localStorage immediately (no flicker)
-    const cachedName = localStorage.getItem("user_name") || "";
-    const cachedLand = localStorage.getItem("user_land_size") || "";
-    const cachedLocation = localStorage.getItem("user_location") || "";
-    const cachedCrops = localStorage.getItem("user_crops") || "";
-    if (cachedName || cachedLocation) {
-      setProfileData({
-        name: cachedName,
-        land_size_acres: cachedLand,
-        location: cachedLocation,
-        crops: cachedCrops ? cachedCrops.split(",").map(c => c.trim()).filter(Boolean) : [],
-      });
-      fetchSchemes(cachedLand, cachedLocation);
-    }
-
-    // Then try to sync fresher data from the backend DB
-    const fetchProfile = async () => {
+  const { data: schemes = LOCAL_SCHEMES, isFetching: schemesLoading, refetch: refetchSchemes } = useQuery({
+    queryKey: ['schemes'],
+    queryFn: async () => {
       try {
-        const phone = localStorage.getItem("user_phone");
-        if (!phone) { setSchemesLoading(false); return; }
-        const response = await fetch(`${API_URL}/api/profile?phone=${encodeURIComponent(phone)}`);
-        const data = await response.json();
-        if (data.status === "success" && data.profile && data.profile.name) {
-          const p = data.profile;
-          setProfileData({
-            name: p.name || cachedName,
-            land_size_acres: p.land_size_acres || cachedLand,
-            location: p.location || cachedLocation,
-            crops: p.crops?.length ? p.crops : cachedCrops.split(",").map((c: string) => c.trim()).filter(Boolean),
-          });
-          // Update localStorage cache with fresher DB data
-          if (p.name) localStorage.setItem("user_name", p.name);
-          if (p.land_size_acres) localStorage.setItem("user_land_size", String(p.land_size_acres));
-          if (p.location) localStorage.setItem("user_location", p.location);
-          if (p.crops?.length) localStorage.setItem("user_crops", p.crops.join(", "));
-          fetchSchemes(p.land_size_acres || cachedLand, p.location || cachedLocation);
-        } else {
-          setSchemesLoading(false);
-        }
-      } catch {
-        setSchemesLoading(false);
-      }
-    };
-    fetchProfile();
-  }, []);
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 8000);
+        const res = await fetch(`${API_URL}/api/schemes`, { signal: ctrl.signal });
+        clearTimeout(t);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        const backendSchemes = Array.isArray(data) ? data : Array.isArray(data?.schemes) ? data.schemes : [];
+        return backendSchemes.length > 0 ? backendSchemes : LOCAL_SCHEMES;
+      } catch { return LOCAL_SCHEMES; }
+    },
+  });
 
-  const fetchSchemes = async (landSize: any, loc: any) => {
-    setSchemesLoading(true);
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-
-      const response = await fetch(
-        `${API_URL}/api/schemes`,
-        { signal: controller.signal }
-      );
-      clearTimeout(timeout);
-
-      if (!response.ok) throw new Error("HTTP " + response.status);
-
-      const data = await response.json();
-      const backendSchemes = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.schemes)
-          ? data.schemes
-          : [];
-
-      const localDocsByScheme = new Map(
-        LOCAL_SCHEMES.map(item => [item.scheme_name.toLowerCase(), item.required_docs])
-      );
-
-      const normalized = backendSchemes
-        .filter((scheme: any) => scheme?.scheme_name)
-        .map((scheme: any) => ({
-          scheme_name: scheme.scheme_name,
-          description: scheme.benefit_description || scheme.description || "Government scheme details available.",
-          required_docs: Array.isArray(scheme.required_docs)
-            ? scheme.required_docs
-            : localDocsByScheme.get(String(scheme.scheme_name).toLowerCase()) || [],
-          link: scheme.official_url || scheme.link || "https://www.myscheme.gov.in/",
-          source: scheme.source || scheme.status || "Government Scheme",
-        }));
-
-      setSchemes(normalized.length > 0 ? normalized : LOCAL_SCHEMES);
-    } catch {
-      // Network error or timeout — fall back to local schemes silently
-      setSchemes(LOCAL_SCHEMES);
-    } finally {
-      setSchemesLoading(false);
-    }
-  };
+  const sortedSchemes = useMemo(() => {
+    const userLoc = (profileData.location || '').trim().toLowerCase();
+    return [...schemes].sort((a, b) => {
+      const aState = (a.state || '').trim().toLowerCase();
+      const bState = (b.state || '').trim().toLowerCase();
+      if (userLoc && aState === userLoc && bState !== userLoc) return -1;
+      if (userLoc && bState === userLoc && aState !== userLoc) return 1;
+      const nat = (s: string) => ['india', 'national', 'central', ''].includes(s);
+      if (nat(aState) && !nat(bState)) return -1;
+      if (nat(bState) && !nat(aState)) return 1;
+      return a.scheme_name.localeCompare(b.scheme_name);
+    });
+  }, [schemes, profileData.location]);
 
   const startEdit = () => {
     setEditForm({
-      name: profileData.name,
+      name:            profileData.name,
       land_size_acres: profileData.land_size_acres,
-      location: profileData.location,
-      crops: profileData.crops.join(", "),
+      location:        profileData.location,
+      crops:           profileData.crops.join(", "),
     });
     setEditing(true);
   };
 
   const saveProfile = async () => {
     setSaving(true);
-    const phone = localStorage.getItem("user_phone") || "";
     const cropsArr = editForm.crops.split(",").map(c => c.trim()).filter(Boolean);
-
-    // Save to localStorage immediately
     localStorage.setItem("user_name", editForm.name);
     localStorage.setItem("user_land_size", editForm.land_size_acres);
     localStorage.setItem("user_location", editForm.location);
     localStorage.setItem("user_crops", editForm.crops);
-
-    // Update UI immediately
-    setProfileData({
-      name: editForm.name,
-      land_size_acres: editForm.land_size_acres,
-      location: editForm.location,
-      crops: cropsArr,
+    queryClient.setQueryData(['profile', phone], {
+      name: editForm.name, land_size_acres: editForm.land_size_acres,
+      location: editForm.location, crops: cropsArr,
     });
     setEditing(false);
-
-    // Persist to backend
     try {
       await fetch(`${API_URL}/api/profile/save`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: editForm.name, phone, land_size_acres: editForm.land_size_acres, location: editForm.location, crops: cropsArr }),
       });
       toast({ title: "Profile saved", description: "Your details have been updated." });
     } catch {
       toast({ title: "Saved locally", description: "Could not reach server, but your details are saved on this device." });
     }
-
-    fetchSchemes(editForm.land_size_acres, editForm.location);
+    refetchSchemes();
     setSaving(false);
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
+    <div style={{ minHeight: '100vh', position: 'relative' }}>
       <FarmBackground />
-      <div className="relative z-50">
+
+      <div style={{ position: 'relative', zIndex: 50 }}>
         <DashboardHeader lastUpdateSeconds={0} sensorNodeOnline={true} />
       </div>
 
-      <div className="relative z-40 max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="mb-10 text-center"
-        >
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-4">
+      <main style={{
+        position: 'relative', zIndex: 10,
+        maxWidth: 1360, margin: '0 auto',
+        padding: '28px 24px 80px',
+        boxSizing: 'border-box',
+      }}>
+
+        {/* ── Page header ── */}
+        <div style={{ marginBottom: 28 }}>
+          <h1 style={{ fontSize: 30, fontWeight: 800, margin: '0 0 4px', fontFamily: "'Nunito', sans-serif", color: textPrimary }}>
             {t('profile_title')}
           </h1>
-        </motion.div>
+          <p style={{ fontSize: 12, color: textSecondary, margin: 0 }}>
+            Manage your farm profile and discover government schemes
+          </p>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* LEFT: PROFILE INFO + HARDWARE */}
-          <div className="lg:col-span-4 flex flex-col gap-6">
-            <Card className="sticky top-24 border-border shadow-md bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75">
-              <CardHeader className="pb-4 border-b border-border/50">
-                <CardTitle className="text-xl flex items-center justify-between">
-                  <span className="flex items-center gap-3"><UserCircle className="w-6 h-6 text-primary" /> {t('Profile')}</span>
-                  {!editing && (
-                    <button onClick={startEdit} className="text-muted-foreground hover:text-primary transition-colors">
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-6 space-y-4">
-                {editing ? (
-                  <div className="space-y-3">
-                    {[
-                      { label: t('signup_full_name'), key: "name", placeholder: "e.g. Rajan Kumar" },
-                      { label: t('signup_land_size'), key: "land_size_acres", placeholder: "e.g. 5.5" },
-                      { label: t('location'), key: "location", placeholder: "e.g. Maharashtra" },
-                      { label: t('signup_crops'), key: "crops", placeholder: "e.g. Wheat, Rice" },
-                    ].map(({ label, key, placeholder }) => (
-                      <div key={key} className="space-y-1">
-                        <label className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">{label}</label>
-                        <input
-                          value={editForm[key as keyof typeof editForm]}
-                          onChange={e => setEditForm(f => ({ ...f, [key]: e.target.value }))}
-                          placeholder={placeholder}
-                          className="w-full px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm outline-none focus:ring-2 focus:ring-primary/40"
-                        />
-                      </div>
-                    ))}
-                    <div className="flex gap-2 pt-2">
-                      <Button onClick={saveProfile} disabled={saving} className="flex-1 gap-2">
-                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} {t('Save')}
-                      </Button>
-                      <Button variant="outline" onClick={() => setEditing(false)} className="flex-1 gap-2">
-                        <X className="w-4 h-4" /> {t('Cancel')}
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {[
-                      { label: t('signup_full_name'), icon: <UserCircle className="w-5 h-5 text-primary/70" />, value: profileData.name },
-                      { label: t('profile_land_size'), icon: <LayoutGrid className="w-5 h-5 text-primary/70" />, value: profileData.land_size_acres ? `${profileData.land_size_acres} Acres` : "" },
-                      { label: t('location'), icon: <MapPin className="w-5 h-5 text-primary/70" />, value: profileData.location },
-                      { label: t('profile_crops_grown'), icon: <Wheat className="w-5 h-5 text-primary/70" />, value: profileData.crops.length > 0 ? profileData.crops.join(", ") : "" },
-                    ].map(({ label, icon, value }) => (
-                      <div key={label} className="space-y-1">
-                        <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">{label}</span>
-                        <div className="flex items-center gap-3 text-base font-medium text-foreground">
-                          {icon}
-                          {value || <span className="text-muted-foreground italic text-sm cursor-pointer hover:text-primary" onClick={startEdit}>{t('profile_tap_to_add')}</span>}
-                        </div>
-                      </div>
-                    ))}
-                  </>
+        {/* ── Top stat cards ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14, marginBottom: 24 }}>
+          <StatCard label="Farmer Name"  value={profileData.name}            icon={<UserCircle size={20} />} accentColor="#2ECC71" isDark={isDark} />
+          <StatCard label="Land Size"    value={profileData.land_size_acres ? `${profileData.land_size_acres} Acres` : ''} icon={<LayoutGrid size={20} />} accentColor="#3B82F6" isDark={isDark} />
+          <StatCard label="Location"     value={profileData.location}         icon={<MapPin size={20} />}    accentColor="#F59E0B" isDark={isDark} />
+          <StatCard label="Crops Grown"  value={profileData.crops.join(', ')} icon={<Wheat size={20} />}    accentColor="#EF4444" isDark={isDark} />
+        </div>
+
+        {/* ── Main two-column grid ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: '300px minmax(0, 1fr)', gap: 20, alignItems: 'start' }}>
+
+          {/* ── LEFT SIDEBAR ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, position: 'sticky', top: 20 }}>
+
+            {/* Profile card */}
+            <div style={{ ...css.card(isDark), padding: '20px' }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, paddingBottom: 14, borderBottom: `1px solid ${borderColor}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Activity size={16} color="#2ECC71" />
+                  <span style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: textPrimary }}>
+                    Profile
+                  </span>
+                </div>
+                {!editing && (
+                  <button
+                    onClick={startEdit}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: textSecondary, display: 'flex', padding: 4 }}
+                  >
+                    <Pencil size={15} />
+                  </button>
                 )}
-              </CardContent>
-            </Card>
+              </div>
 
-            {/* HARDWARE CONNECTION CARD */}
-            <Card className="border-border shadow-md bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75">
-              <CardHeader className="pb-4 border-b border-border/50">
-                <CardTitle className="text-xl flex items-center gap-3">
-                  <Cpu className="w-6 h-6 text-primary" />
-                  Hardware Device
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pt-5 space-y-4">
-                {hardwareConnected ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/10 border border-primary/20">
-                      <div className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
-                      <div>
-                        <p className="text-sm font-bold text-foreground">AgriSense WS01</p>
-                        <p className="text-xs text-muted-foreground">FPGA Weather Station • Live</p>
-                      </div>
-                      <Wifi className="w-4 h-4 text-primary ml-auto" />
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
-                      onClick={() => { disconnectHardware(); toast({ title: "Hardware Disconnected" }); }}
-                    >
-                      <WifiOff className="w-4 h-4" /> Disconnect
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 border border-border">
-                      <WifiOff className="w-4 h-4 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground">No device connected</p>
-                    </div>
-                    <Button
-                      className="w-full gap-2"
-                      onClick={handleConnectHardware}
-                      disabled={hwConnecting}
-                    >
-                      {hwConnecting
-                        ? <><Loader2 className="w-4 h-4 animate-spin" /> Connecting...</>
-                        : <><Wifi className="w-4 h-4" /> Connect AgriSense WS01</>
-                      }
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full gap-2"
-                      onClick={() => navigate('/buy-hardware')}
-                    >
-                      <ShoppingCart className="w-4 h-4" /> Buy New Hardware
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* RIGHT: SCHEMES & DOCS */}
-          <div className="lg:col-span-8">
-            <Card className="border-border shadow-md bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/75">
-              <CardHeader className="flex flex-row items-center justify-between pb-6 border-b border-border/50">
-                <div className="flex items-center gap-3">
-                  <ShieldCheck className="w-7 h-7 text-primary" />
-                  <div>
-                    <CardTitle className="text-2xl flex items-center gap-2">
-                      {t('Recommended Schemes')}
-                      {schemesLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
-                    </CardTitle>
-
+              {editing ? (
+                <div>
+                  <FieldInput label="Full Name"   value={editForm.name}            onChange={v => setEditForm(f => ({ ...f, name: v }))}            placeholder="e.g. Rajan Kumar"     isDark={isDark} />
+                  <FieldInput label="Land (Acres)"value={editForm.land_size_acres} onChange={v => setEditForm(f => ({ ...f, land_size_acres: v }))} placeholder="e.g. 5.5"            isDark={isDark} />
+                  <FieldInput label="Location"    value={editForm.location}         onChange={v => setEditForm(f => ({ ...f, location: v }))}         placeholder="e.g. Maharashtra"    isDark={isDark} />
+                  <FieldInput label="Crops"       value={editForm.crops}            onChange={v => setEditForm(f => ({ ...f, crops: v }))}            placeholder="e.g. Wheat, Rice"    isDark={isDark} />
+                  <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                    <PrimaryBtn onClick={saveProfile} disabled={saving}>
+                      {saving ? <Loader2 size={15} style={{ animation: 'profile-spin 1s linear infinite' }} /> : <Check size={15} />}
+                      {saving ? 'Saving…' : 'Save'}
+                    </PrimaryBtn>
+                    <PrimaryBtn outline onClick={() => setEditing(false)}>
+                      <X size={15} /> Cancel
+                    </PrimaryBtn>
                   </div>
                 </div>
-                <Button
-                  variant="secondary"
-                  size="sm"
+              ) : (
+                <>
+                  <FieldRow label="Full Name"   icon={<UserCircle size={15} />} value={profileData.name}                              onAdd={startEdit} isDark={isDark} />
+                  <FieldRow label="Land Size"   icon={<LayoutGrid size={15} />} value={profileData.land_size_acres ? `${profileData.land_size_acres} Acres` : ''} onAdd={startEdit} isDark={isDark} />
+                  <FieldRow label="Location"    icon={<MapPin size={15} />}     value={profileData.location}                          onAdd={startEdit} isDark={isDark} />
+                  <FieldRow label="Crops Grown" icon={<Wheat size={15} />}      value={profileData.crops.join(', ')}                  onAdd={startEdit} isDark={isDark} />
+                </>
+              )}
+            </div>
+
+            {/* Hardware card */}
+            <div style={{ ...css.card(isDark), padding: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18, paddingBottom: 14, borderBottom: `1px solid ${borderColor}` }}>
+                <Cpu size={16} color="#2ECC71" />
+                <span style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: textPrimary }}>
+                  Hardware Device
+                </span>
+              </div>
+
+              {hardwareConnected ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '12px 14px', borderRadius: 12,
+                    background: 'rgba(46,204,113,0.08)',
+                    border: '1px solid rgba(46,204,113,0.2)',
+                  }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#2ECC71', animation: 'profile-pulse 2s infinite', flexShrink: 0 }} />
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: 13, fontWeight: 800, color: textPrimary, margin: 0 }}>AgriSense WS01</p>
+                      <p style={{ fontSize: 11, color: textSecondary, margin: 0 }}>FPGA Weather Station · Live</p>
+                    </div>
+                    <Wifi size={16} color="#2ECC71" />
+                  </div>
+                  <PrimaryBtn danger outline onClick={() => { disconnectHardware(); toast({ title: "Hardware Disconnected" }); }}>
+                    <WifiOff size={15} /> Disconnect
+                  </PrimaryBtn>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '12px 14px', borderRadius: 12,
+                    background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+                    border: `1px solid ${borderColor}`,
+                  }}>
+                    <WifiOff size={16} color={textSecondary} />
+                    <p style={{ fontSize: 13, color: textSecondary, margin: 0 }}>No device connected</p>
+                  </div>
+                  <PrimaryBtn onClick={handleConnectHardware} disabled={hwConnecting}>
+                    {hwConnecting
+                      ? <><Loader2 size={15} style={{ animation: 'profile-spin 1s linear infinite' }} /> Connecting…</>
+                      : <><Wifi size={15} /> Connect AgriSense WS01</>
+                    }
+                  </PrimaryBtn>
+                  <PrimaryBtn outline onClick={() => navigate('/buy-hardware')}>
+                    <ShoppingCart size={15} /> Buy New Hardware
+                  </PrimaryBtn>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── RIGHT: SCHEMES ── */}
+          <div>
+            {/* Schemes header card */}
+            <div style={{
+              ...css.card(isDark),
+              padding: '18px 22px',
+              marginBottom: 16,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <ShieldCheck size={20} color="#2ECC71" />
+                <div>
+                  <h2 style={{ fontSize: 18, fontWeight: 800, color: textPrimary, margin: 0, fontFamily: "'Nunito', sans-serif" }}>
+                    {t('Recommended Schemes')}
+                  </h2>
+                  <p style={{ fontSize: 12, color: textSecondary, margin: '2px 0 0' }}>
+                    {sortedSchemes.length} schemes · Sorted by relevance
+                  </p>
+                </div>
+                {schemesLoading && <Loader2 size={16} color={textSecondary} style={{ animation: 'profile-spin 1s linear infinite' }} />}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Badge
+                  label={profileData.location ? `📍 ${profileData.location}` : 'All India'}
+                  color="#2ECC71"
+                  bg="rgba(46,204,113,0.1)"
+                />
+                <button
+                  onClick={() => refetchSchemes()}
                   disabled={schemesLoading}
-                  onClick={() => fetchSchemes(profileData.land_size_acres, profileData.location)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '0 16px', height: 38, borderRadius: 10, border: 'none',
+                    background: '#2ECC71', color: '#fff',
+                    cursor: schemesLoading ? 'not-allowed' : 'pointer',
+                    fontWeight: 700, fontSize: 13, opacity: schemesLoading ? 0.65 : 1,
+                    boxShadow: schemesLoading ? 'none' : '0 2px 10px rgba(46,204,113,0.25)',
+                  }}
                 >
-                  {schemesLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : t('advisor_refresh')}
-                </Button>
-              </CardHeader>
+                  <ShieldCheck size={14} />
+                  {t('advisor_refresh')}
+                </button>
+              </div>
+            </div>
 
-              <CardContent className="pt-6">
-                {schemesLoading && schemes.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <Loader2 className="w-10 h-10 animate-spin text-primary/50 mb-4" />
-                    <p className="text-muted-foreground font-medium">{t('profile_loading_schemes')}</p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {schemes.map((scheme, i) => (
-                      <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.1 * i }}
-                        key={i}
-                      >
-                        <div className="relative p-6 rounded-xl border border-border bg-card shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-                          <div className="absolute top-0 left-0 w-1.5 h-full bg-primary" />
-
-                          <div className="space-y-3 pl-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <h4 className="text-xl font-bold tracking-tight text-foreground">
-                                {scheme.scheme_name}
-                              </h4>
-
-                            </div>
-                            <p className="text-muted-foreground text-sm leading-relaxed">
-                              {scheme.description}
-                            </p>
-
-                            <div className="bg-muted/40 rounded-lg p-4 mt-4 border border-border/50">
-                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                                {t('profile_required_docs')}
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                {scheme.required_docs.map((doc: string, idx: number) => (
-                                  <span key={idx} className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary border border-primary/20">
-                                    {doc}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-
-                            <div className="pt-4">
-                              <Button
-                                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm flex items-center justify-center gap-2"
-                                onClick={() => window.open(scheme.link, "_blank")}
-                              >
-                                <ExternalLink className="w-4 h-4" /> {t('profile_apply_btn')}
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {/* Scheme cards list */}
+            {schemesLoading && schemes.length === 0 ? (
+              <div style={{
+                ...css.card(isDark), padding: '60px 20px',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+              }}>
+                <Loader2 size={32} color="#2ECC71" style={{ animation: 'profile-spin 1s linear infinite' }} />
+                <p style={{ color: textSecondary, fontWeight: 600, fontSize: 14, margin: 0 }}>
+                  {t('profile_loading_schemes')}
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {sortedSchemes.map((scheme, i) => {
+                  const userLoc  = (profileData.location || '').trim().toLowerCase();
+                  const isMatch  = !!userLoc && (scheme.state || '').trim().toLowerCase() === userLoc;
+                  return (
+                    <SchemeCard
+                      key={scheme.scheme_id || i}
+                      scheme={scheme}
+                      isMatch={isMatch}
+                      index={i}
+                      isDark={isDark}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      </main>
+
+      <style>{`
+        @keyframes profile-spin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        @keyframes profile-pulse {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0.3; }
+        }
+      `}</style>
     </div>
   );
 }

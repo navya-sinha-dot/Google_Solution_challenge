@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { FarmBackground } from "@/components/FarmTheme";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useQuery } from "@tanstack/react-query";
 
 const API_URL = import.meta.env.VITE_API_URL || "";
 
@@ -469,10 +470,8 @@ export default function AIHardwareAccelerator() {
   const [rainResult,      setRainResult]      = useState<any>(null);
   const [fusionResult,    setFusionResult]    = useState<any>(null);
   const [combinedResult,  setCombinedResult]  = useState<any>(null);
-  const [connectionStatus,   setConnectionStatus]   = useState(false);
-  const [lastUpdateSeconds,  setLastUpdateSeconds]  = useState(0);
-  const [hwMode,             setHwMode]             = useState("unknown");
   const [activePipeline,     setActivePipeline]     = useState<string[]>([]);
+  const [hwModeState,        setHwModeState]        = useState<string | null>(null);
 
   // Tooltip state — canvas-relative coordinates
   const graphContainerRef = useRef<HTMLDivElement>(null);
@@ -480,48 +479,65 @@ export default function AIHardwareAccelerator() {
   const [tipX, setTipX] = useState(0);
   const [tipY, setTipY] = useState(0);
 
-  const [sensor, setSensor] = useState({
+  const { data: initialHwMode = "unknown" } = useQuery({
+    queryKey: ['fpgaStatus'],
+    queryFn: async () => {
+      try {
+        const r = await fetch(`${API_URL}/api/fpga/status`);
+        if (r.ok) {
+          const d = await r.json();
+          return d.hardware_mode || "unknown";
+        }
+      } catch {
+        return "disconnected";
+      }
+      return "unknown";
+    },
+    refetchInterval: 10000,
+  });
+
+  const hwMode = hwModeState || initialHwMode;
+  const setHwMode = (mode: string) => setHwModeState(mode);
+
+  const { data: sensor = {
     temperature: 25, humidity: 60, pressure: 1013, wind_speed: 5,
     rainfall: 0, soil_moisture: 50, soil_temperature: 26,
     light_level: 70, pm25: 60, pm10: 120, uv_index: 2, battery_voltage: 12.5,
+  }, dataUpdatedAt: sensorUpdatedAt } = useQuery({
+    queryKey: ['latestSensorData', 'WS01'],
+    queryFn: async () => {
+      const r = await fetch(`${API_URL}/api/sensors/latest/WS01`);
+      if (!r.ok) throw new Error('Sensor fetch failed');
+      const d = await r.json();
+      return {
+        temperature:      d.temperature       ?? 25,
+        humidity:         d.humidity          ?? 60,
+        pressure:         d.pressure          ?? 1013,
+        wind_speed:       d.windSpeed         ?? d.wind_speed    ?? 5,
+        rainfall:         d.rainfall          ?? 0,
+        soil_moisture:    d.soilMoisture      ?? d.soil_moisture ?? 50,
+        soil_temperature: d.soilTemperature   ?? d.soil_temperature ?? 26,
+        light_level:      d.lightIntensity    ?? d.light_level   ?? 70,
+        pm25:             d.airQualityPM25    ?? d.pm25          ?? 60,
+        pm10:             d.airQualityPM10    ?? d.pm10          ?? 120,
+        uv_index:         d.uvIndex           ?? d.uv_index      ?? 2,
+        battery_voltage:  d.batteryVoltage    ?? d.battery_voltage ?? 12.5,
+      };
+    },
+    refetchInterval: 10000,
   });
 
+  const connectionStatus = !!sensor;
+
+  const [lastUpdateSeconds, setLastUpdateSeconds] = useState(0);
   useEffect(() => {
-    fetchSensor(); fetchHw();
-    const iv = setInterval(() => { fetchSensor(); setLastUpdateSeconds(s => s + 10); }, 10000);
-    return () => clearInterval(iv);
-  }, []);
-
-  const fetchHw = async () => {
-    try {
-      const r = await fetch(`${API_URL}/api/fpga/status`);
-      if (r.ok) { const d = await r.json(); setHwMode(d.hardware_mode || "unknown"); }
-    } catch { setHwMode("disconnected"); }
-  };
-
-  const fetchSensor = async () => {
-    try {
-      const r = await fetch(`${API_URL}/api/sensors/latest/WS01`);
-      if (r.ok) {
-        const d = await r.json();
-        setConnectionStatus(true); setLastUpdateSeconds(0);
-        setSensor({
-          temperature:      d.temperature       ?? 25,
-          humidity:         d.humidity          ?? 60,
-          pressure:         d.pressure          ?? 1013,
-          wind_speed:       d.windSpeed         ?? d.wind_speed    ?? 5,
-          rainfall:         d.rainfall          ?? 0,
-          soil_moisture:    d.soilMoisture      ?? d.soil_moisture ?? 50,
-          soil_temperature: d.soilTemperature   ?? d.soil_temperature ?? 26,
-          light_level:      d.lightIntensity    ?? d.light_level   ?? 70,
-          pm25:             d.airQualityPM25    ?? d.pm25          ?? 60,
-          pm10:             d.airQualityPM10    ?? d.pm10          ?? 120,
-          uv_index:         d.uvIndex           ?? d.uv_index      ?? 2,
-          battery_voltage:  d.batteryVoltage    ?? d.battery_voltage ?? 12.5,
-        });
-      }
-    } catch { setConnectionStatus(false); }
-  };
+    if (!sensorUpdatedAt) return;
+    setLastUpdateSeconds(0);
+    const timer = setInterval(() => {
+      setLastUpdateSeconds(Math.floor((Date.now() - sensorUpdatedAt) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [sensorUpdatedAt]);
 
   const predictRain = async () => {
     setLoadingRain(true);

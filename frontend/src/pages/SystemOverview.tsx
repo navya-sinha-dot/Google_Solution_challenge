@@ -7,25 +7,19 @@ import { getSystemHealth, SystemHealth } from '@/lib/weatherData';
 import { WeatherStation } from '@/components/overview/WeatherStation';
 import { Info, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 
 export default function SystemOverview() {
     const { theme } = useTheme();
     const isDark = theme === 'dark';
     const { t } = useLanguage();
-    const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
     const [selectedSensor, setSelectedSensor] = useState<string | null>(null);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const health = await getSystemHealth();
-                setSystemHealth(health);
-            } catch (err) {
-                console.error('Error loading health data:', err);
-            }
-        };
-        fetchData();
-    }, []);
+    const { data: systemHealth = null } = useQuery({
+        queryKey: ['systemHealth'],
+        queryFn: getSystemHealth,
+        refetchInterval: 10000,
+    });
 
     const sensorDescriptions: Record<string, { title: string; desc: string }> = {
         windVane: {

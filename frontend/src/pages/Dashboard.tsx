@@ -30,6 +30,7 @@ import {
   Waves,
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 // Add pulse animation styles
 const styleSheet = document.createElement("style");
@@ -52,112 +53,54 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 
 export default function Dashboard() {
   const { t } = useLanguage();
-  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
-  const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [hasRealData, setHasRealData] = useState(false);
 
-  // Live Sensor Data State
-  const [lastUpdate, setLastUpdate] = useState<string>("Never");
-  const [connectionStatus, setConnectionStatus] = useState<boolean>(false);
-  const [currentSensorData, setCurrentSensorData] = useState({
-    temperature: 25,
-    humidity: 60,
-    pressure: 1013,
-    wind_speed: 5,
-    rainfall: 0,
-    soil_moisture: 50,
-    soil_temperature: 30,
-    light_level: 70,
-    pm25: 60,
-    pm10: 120,
-    uv_index: 2,
-    battery_voltage: 12.5,
+  const { data: weatherData, error: weatherError } = useQuery({
+    queryKey: ['weatherData'],
+    queryFn: getCurrentWeatherData,
+    refetchInterval: 10000,
   });
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        console.log('Dashboard: Fetching weather, health, and alerts...');
-        const [weather, health, recentAlerts] = await Promise.all([
-          getCurrentWeatherData(),
-          getSystemHealth(),
-          getRecentAlerts(),
-        ]);
-        console.log(' Weather data:', weather);
-        console.log(' System health:', health);
-        console.log(' Recent alerts:', recentAlerts);
-        setWeatherData(weather);
-        setSystemHealth(health);
-        setAlerts(recentAlerts);
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : 'Failed to load data';
-        setError(errMsg);
-        console.error(' Error loading dashboard data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const { data: systemHealth, error: healthError } = useQuery({
+    queryKey: ['systemHealth'],
+    queryFn: getSystemHealth,
+    refetchInterval: 10000,
+  });
 
-    // Fetch sensor data for live display and system inferences
-    const fetchSensorData = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/sensors/latest/WS01`);
-        if (response.ok) {
-          const data = await response.json();
-          console.log(' Sensor API Response:', data);
-          setConnectionStatus(true);
-          const mappedData = {
-            temperature: data.temperature ?? 25,
-            humidity: data.humidity ?? 60,
-            pressure: data.pressure ?? 1013,
-            wind_speed: data.windSpeed ?? data.wind_speed ?? 5,
-            rainfall: data.rainfall ?? 0,
-            soil_moisture: data.soilMoisture ?? data.soil_moisture ?? 50,
-            soil_temperature: data.soilTemperature ?? data.soil_temperature ?? 30,
-            light_level: data.lightIntensity ?? data.light_level ?? 70,
-            pm25: data.airQualityPM25 ?? data.pm25 ?? 60,
-            pm10: data.airQualityPM10 ?? data.pm10 ?? 120,
-            uv_index: data.uvIndex ?? data.uv_index ?? 2,
-            battery_voltage: data.batteryVoltage ?? data.battery_voltage ?? 12.5,
-          };
-          console.log(' Mapped sensor data:', mappedData);
-          setCurrentSensorData(mappedData);
-          const now = new Date();
-          setLastUpdate(now.toLocaleTimeString());
-          console.log(' Sensor updated at:', now.toLocaleTimeString());
-        } else {
-          console.error(' Sensor API returned:', response.status);
-          setConnectionStatus(false);
-        }
-      } catch (error) {
-        setConnectionStatus(false);
-        console.error(' Error fetching sensors:', error);
-      }
-    };
+  const { data: alerts = [] } = useQuery({
+    queryKey: ['recentAlerts'],
+    queryFn: getRecentAlerts,
+    refetchInterval: 10000,
+  });
 
-    // Initial fetch
-    fetchData();
-    fetchSensorData();
+  const { data: currentSensorData, dataUpdatedAt: sensorUpdatedAt } = useQuery({
+    queryKey: ['latestSensorData', 'WS01'],
+    queryFn: async () => {
+      console.log('Dashboard: Fetching fresh sensor data...');
+      const response = await fetch(`${API_URL}/api/sensors/latest/WS01`);
+      if (!response.ok) throw new Error('Sensor fetch failed');
+      const data = await response.json();
+      return {
+        temperature: data.temperature ?? 25,
+        humidity: data.humidity ?? 60,
+        pressure: data.pressure ?? 1013,
+        wind_speed: data.windSpeed ?? data.wind_speed ?? 5,
+        rainfall: data.rainfall ?? 0,
+        soil_moisture: data.soilMoisture ?? data.soil_moisture ?? 50,
+        soil_temperature: data.soilTemperature ?? data.soil_temperature ?? 30,
+        light_level: data.lightIntensity ?? data.light_level ?? 70,
+        pm25: data.airQualityPM25 ?? data.pm25 ?? 60,
+        pm10: data.airQualityPM10 ?? data.pm10 ?? 120,
+        uv_index: data.uvIndex ?? data.uv_index ?? 2,
+        battery_voltage: data.batteryVoltage ?? data.battery_voltage ?? 12.5,
+      };
+    },
+    refetchInterval: 10000,
+  });
 
-    console.log('Dashboard useEffect: Setting up polling every 10 seconds');
-
-    // Auto-refresh ALL data every 10 seconds (now includes weatherData, health, alerts)
-    const interval = setInterval(() => {
-      console.log('Dashboard: Fetching fresh data...');
-      fetchData();
-      fetchSensorData();
-    }, 10000);
-
-    return () => {
-      console.log('Dashboard: Cleaning up intervals');
-      clearInterval(interval);
-    };
-  }, []);
+  const loading = !weatherData || !systemHealth || !currentSensorData;
+  const error = (weatherError || healthError) ? ((weatherError?.message || '') + ' ' + (healthError?.message || '')) : null;
+  const connectionStatus = !!currentSensorData;
+  const lastUpdate = sensorUpdatedAt ? new Date(sensorUpdatedAt).toLocaleTimeString() : "Never";
 
   if (loading && !weatherData) {
     return (
@@ -184,17 +127,17 @@ export default function Dashboard() {
 
   // Use live sensor data for display (updates every 10 seconds), fallback to weatherData
   // Format all numbers to 2 decimal places for readability
-  const displayTemp = Number(currentSensorData.temperature.toFixed(2));
-  const displayHumidity = Number(currentSensorData.humidity.toFixed(2));
-  const displayPressure = Number(currentSensorData.pressure.toFixed(2));
-  const displayWindSpeed = Number(currentSensorData.wind_speed.toFixed(2));
-  const displayRainfall = Number(currentSensorData.rainfall.toFixed(2));
-  const displaySoilTemp = Number(currentSensorData.soil_temperature.toFixed(2));
-  const displaySoilMoisture = Number(currentSensorData.soil_moisture.toFixed(2));
-  const displayPM25 = Number(currentSensorData.pm25.toFixed(1));
-  const displayPM10 = Number(currentSensorData.pm10.toFixed(1));
-  const displayUVIndex = Number(currentSensorData.uv_index.toFixed(1));
-  const displayLightLevel = Number(currentSensorData.light_level.toFixed(1));
+  const displayTemp = Number((currentSensorData?.temperature ?? weatherData.temperature).toFixed(2));
+  const displayHumidity = Number((currentSensorData?.humidity ?? weatherData.humidity).toFixed(2));
+  const displayPressure = Number((currentSensorData?.pressure ?? weatherData.pressure).toFixed(2));
+  const displayWindSpeed = Number((currentSensorData?.wind_speed ?? weatherData.windSpeed).toFixed(2));
+  const displayRainfall = Number((currentSensorData?.rainfall ?? weatherData.rainfall).toFixed(2));
+  const displaySoilTemp = Number((currentSensorData?.soil_temperature ?? weatherData.soilTemperature).toFixed(2));
+  const displaySoilMoisture = Number((currentSensorData?.soil_moisture ?? weatherData.soilMoisture).toFixed(2));
+  const displayPM25 = Number((currentSensorData?.pm25 ?? weatherData.airQualityPM25).toFixed(1));
+  const displayPM10 = Number((currentSensorData?.pm10 ?? weatherData.airQualityPM10).toFixed(1));
+  const displayUVIndex = Number((currentSensorData?.uv_index ?? weatherData.uvIndex).toFixed(1));
+  const displayLightLevel = Number((currentSensorData?.light_level ?? weatherData.lightIntensity).toFixed(1));
 
   const atmosphericParams = [
     { icon: <Thermometer className="w-5 h-5" />, labelKey: 'ambient_temperature', value: displayTemp, unit: '°C', status: getParameterStatus('temperature', displayTemp) },
