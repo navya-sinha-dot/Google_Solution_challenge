@@ -1,4 +1,3 @@
-
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageSelector } from '@/components/LanguageSelector';
 import { useAuth } from '@/contexts/AuthContext';
@@ -99,27 +98,27 @@ export function DashboardHeader({
         justifyContent: 'center',
       }}
     >
-<div
-  style={{
-    width: '100%',
-    maxWidth: '1400px',
-    height: '58px',
-    borderRadius: '18px',
-    overflow: 'hidden',
-    backdropFilter: 'blur(24px)',
-    WebkitBackdropFilter: 'blur(24px)',
-    background: isDark ? 'rgba(15,23,42,0.90)' : 'rgba(255,255,255,0.95)',
-    border: isDark
-      ? '1.5px solid rgba(255,255,255,0.08)'
-      : '1.5px solid rgba(15,23,42,0.10)',
-    borderTop: isDark
-      ? '2px solid rgba(16,185,129,0.40)'
-      : '2px solid rgba(16,185,129,0.30)',
-    boxShadow: isDark
-      ? '0 8px 28px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.20)'
-      : '0 8px 24px rgba(15,23,42,0.07), 0 2px 6px rgba(15,23,42,0.04)',
-  }}
->
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '1400px',
+          height: '64px',        // was 58px
+          borderRadius: '18px',
+          overflow: 'hidden',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          background: isDark ? 'rgba(10,10,10,0.92)' : 'rgba(255,255,255,0.95)',
+          border: isDark
+            ? '1.5px solid rgba(255,255,255,0.07)'
+            : '1.5px solid rgba(15,23,42,0.10)',
+          borderTop: isDark
+            ? '2px solid rgba(16,185,129,0.40)'
+            : '2px solid rgba(16,185,129,0.30)',
+          boxShadow: isDark
+            ? '0 8px 28px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.20)'
+            : '0 8px 24px rgba(15,23,42,0.07), 0 2px 6px rgba(15,23,42,0.04)',
+        }}
+      >
         <div
           style={{
             height: '100%',
@@ -142,10 +141,13 @@ export function DashboardHeader({
               src="/logo.png"
               alt="SkyView"
               style={{
-                height: '44px',
+                height: '52px',        // was 44px
                 width: 'auto',
                 objectFit: 'contain',
                 display: 'block',
+                filter: isDark
+                  ? 'none'
+                  : 'drop-shadow(0 1px 3px rgba(0,0,0,0.18))',  // visibility on light bg
               }}
             />
           </Link>
@@ -172,12 +174,12 @@ export function DashboardHeader({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '5px',
-                    padding: '8px 11px',
+                    gap: '6px',              // was 5px
+                    padding: '9px 13px',     // was 8px 11px
                     borderRadius: '11px',
                     textDecoration: 'none',
                     whiteSpace: 'nowrap',
-                    fontSize: '11px',
+                    fontSize: '13px',        // was 11px
                     fontWeight: isActive ? 700 : 500,
                     flexShrink: 0,
                     transition: 'all 0.25s ease',
@@ -198,7 +200,7 @@ export function DashboardHeader({
                       : '1px solid transparent',
                   }}
                 >
-                  <Icon size={13} />
+                  <Icon size={15} />         {/* was 13 */}
                   {item.label}
                 </Link>
               );
@@ -230,9 +232,7 @@ export function DashboardHeader({
                   width: '7px',
                   height: '7px',
                   borderRadius: '50%',
-                  background: sensorNodeOnline
-                    ? '#10B981'
-                    : '#EF4444',
+                  background: sensorNodeOnline ? '#10B981' : '#EF4444',
                 }}
               />
 
@@ -240,9 +240,7 @@ export function DashboardHeader({
                 style={{
                   fontSize: '10px',
                   fontWeight: 700,
-                  color: sensorNodeOnline
-                    ? '#10B981'
-                    : '#EF4444',
+                  color: sensorNodeOnline ? '#10B981' : '#EF4444',
                 }}
               >
                 {lastUpdateSeconds}s
@@ -276,4 +274,3 @@ export function DashboardHeader({
     </div>
   );
 }
-
