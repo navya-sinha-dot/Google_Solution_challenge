@@ -53,7 +53,7 @@ services:
       mqtt:
         condition: service_healthy
     env_file:
-      - .env
+      - skyview/.env
     environment:
       DATABASE_URL: postgresql://skyview_user:skyview_pass@db:5432/skyview
       MQTT_BROKER: mqtt

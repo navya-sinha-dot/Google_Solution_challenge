@@ -46,11 +46,6 @@ export function DashboardHeader({
       icon: LayoutDashboard,
     },
     {
-      path: '/db',
-      label: 'Data',
-      icon: Database,
-    },
-    {
       path: '/profile',
       label: 'Schemes',
       icon: Landmark,
@@ -96,6 +91,11 @@ export function DashboardHeader({
         padding: '0 24px',
         display: 'flex',
         justifyContent: 'center',
+        alignItems: 'center',
+        gap: '12px',
+        width: '100%',
+        maxWidth: '1480px',
+        margin: '0 auto',
       }}
     >
       <div
@@ -188,8 +188,8 @@ export function DashboardHeader({
                         ? '#ffffff'
                         : '#0f172a'
                       : isDark
-                      ? 'rgba(255,255,255,0.60)'
-                      : 'rgba(15,23,42,0.60)',
+                        ? 'rgba(255,255,255,0.60)'
+                        : 'rgba(15,23,42,0.60)',
                     background: isActive
                       ? isDark
                         ? 'rgba(16,185,129,0.14)'
@@ -271,6 +271,43 @@ export function DashboardHeader({
           </div>
         </div>
       </div>
+
+      <Link
+        to="/db"
+        style={{
+          width: '48px',
+          height: '48px',
+          borderRadius: '14px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          background: location.pathname === '/db'
+            ? isDark ? 'rgba(16,185,129,0.18)' : 'rgba(16,185,129,0.12)'
+            : isDark ? 'rgba(10,10,10,0.92)' : 'rgba(255,255,255,0.95)',
+          border: location.pathname === '/db'
+            ? '2px solid #10B981'
+            : isDark ? '1.5px solid rgba(255,255,255,0.07)' : '1.5px solid rgba(15,23,42,0.10)',
+          boxShadow: isDark
+            ? '0 8px 28px rgba(0,0,0,0.35)'
+            : '0 8px 24px rgba(15,23,42,0.07)',
+          transition: 'all 0.25s ease',
+          flexShrink: 0,
+        }}
+        title="Database Explorer"
+        className="hover:scale-105"
+      >
+        <Database
+          style={{
+            width: '18px',
+            height: '18px',
+            color: location.pathname === '/db'
+              ? '#10B981'
+              : isDark ? 'rgba(255,255,255,0.70)' : 'rgba(15,23,42,0.70)',
+          }}
+        />
+      </Link>
     </div>
   );
 }

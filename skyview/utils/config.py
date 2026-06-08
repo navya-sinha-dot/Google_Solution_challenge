@@ -18,16 +18,13 @@ from typing import List, Optional
 
 from dotenv import load_dotenv
 
-# Load both the repository root .env and the skyview/.env file if present.
-# The project has used both locations, so this keeps Groq keys available no
-# matter where uvicorn is launched from.
+# Strictly load the skyview/.env file.
 _CONFIG_DIR = Path(__file__).resolve().parent
 _SKYVIEW_DIR = _CONFIG_DIR.parent
-_REPO_ROOT = _SKYVIEW_DIR.parent
 
-for _env_path in (_REPO_ROOT / ".env", _SKYVIEW_DIR / ".env"):
-    if _env_path.exists():
-        load_dotenv(_env_path, override=False)
+_env_path = _SKYVIEW_DIR / ".env"
+if _env_path.exists():
+    load_dotenv(_env_path, override=True)
 
 
 class Settings:

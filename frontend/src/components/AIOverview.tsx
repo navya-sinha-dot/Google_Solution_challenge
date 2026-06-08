@@ -48,7 +48,7 @@ export function AIOverview({ page, extraContext }: AIOverviewProps) {
   const [chatInput, setChatInput] = useState<string>('');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [chatLoading, setChatLoading] = useState<boolean>(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   const getCacheKey = () => `ai_overview_${page}_${language}`;
 
@@ -109,8 +109,11 @@ export function AIOverview({ page, extraContext }: AIOverviewProps) {
   }, [page, language]);
 
   useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
     }
   }, [chatHistory, chatLoading]);
 
@@ -605,6 +608,7 @@ export function AIOverview({ page, extraContext }: AIOverviewProps) {
                 {/* Chat history */}
                 {chatHistory.length > 0 && (
                   <div
+                    ref={chatContainerRef}
                     style={{
                       maxHeight: '240px',
                       overflowY: 'auto',
@@ -702,7 +706,6 @@ export function AIOverview({ page, extraContext }: AIOverviewProps) {
                         <span>Kisan Mitra is writing...</span>
                       </div>
                     )}
-                    <div ref={chatEndRef} />
                   </div>
                 )}
 

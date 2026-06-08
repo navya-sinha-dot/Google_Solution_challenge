@@ -205,7 +205,7 @@ export default function Dashboard() {
             </GlassSection>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <SystemHealthPanel health={systemHealth} />
-              <StationMapPanel />
+              {/* <StationMapPanel /> */}
               <AlertsPanel alerts={alerts} />
             </div>
           </div>
