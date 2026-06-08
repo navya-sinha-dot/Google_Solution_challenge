@@ -5,6 +5,7 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { FarmBackground } from "@/components/FarmTheme";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useQuery } from "@tanstack/react-query";
+import { AIOverview } from "@/components/AIOverview";
 
 const API_URL = import.meta.env.VITE_API_URL || "";
 
@@ -603,6 +604,8 @@ export default function AIHardwareAccelerator() {
             {hwLabel}
           </span>
         </div>
+
+        <AIOverview page="growth" />
 
         {/* Graph panel */}
         <div style={{ borderRadius: 16, border: `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)"}`, background: isDark ? "rgba(8,11,15,0.9)" : "rgba(250,252,250,0.92)", backdropFilter: "blur(16px)", padding: "1.25rem 1.5rem 1rem", marginBottom: "1.5rem", overflow: "hidden" }}>

@@ -3,6 +3,7 @@ import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { FarmBackground, GlassSection } from '@/components/FarmTheme';
 import { getSystemHealth, getHistoricalData } from '@/lib/weatherData';
 import WeatherLoader from '@/components/WeatherLoader';
+import { AIOverview } from '@/components/AIOverview';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, AreaChart, Area, ReferenceLine, Brush,
@@ -331,6 +332,8 @@ export default function Trends() {
             </button>
           </div>
         </div>
+
+        <AIOverview page="trends" />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 

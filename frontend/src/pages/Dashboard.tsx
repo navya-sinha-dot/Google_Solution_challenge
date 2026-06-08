@@ -7,6 +7,7 @@ import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { WeatherInsightPanel } from '@/components/dashboard/WeatherInsightPanel';
 import { FarmBackground, GlassSection } from '@/components/FarmTheme';
 import WeatherLoader from '@/components/WeatherLoader';
+import { AIOverview } from '@/components/AIOverview';
 import {
   getCurrentWeatherData,
   getSystemHealth,
@@ -170,6 +171,7 @@ export default function Dashboard() {
       </div>
 
       <main style={{ position: 'relative', zIndex: 10, maxWidth: '1400px', margin: '0 auto', padding: '32px 20px 60px' }}>
+        <AIOverview page="dashboard" />
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
 
           <GlassSection title={t('atmospheric_conditions')}>

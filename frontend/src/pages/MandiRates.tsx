@@ -4,6 +4,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { FarmBackground, GlassSection } from '@/components/FarmTheme';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { AIOverview } from '@/components/AIOverview';
 import {
   TrendingUp, TrendingDown, Search, RefreshCw,
   ArrowUpDown, IndianRupee, MapPin, Calendar,
@@ -418,6 +419,8 @@ export default function MandiRates() {
             </div>
           </div>
         </div>
+
+        <AIOverview page="mandi" />
 
         {/* ── Filters bar ── */}
         <div style={{

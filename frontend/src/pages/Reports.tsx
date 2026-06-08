@@ -30,8 +30,11 @@ const defaultSensor: SensorData = {
 };
 
 // ─── Text Preprocessing for Markdown/JSON Cleanliness ────────────────────────
-function preprocessText(text: string): string {
+function preprocessText(text: any): string {
   if (!text) return '';
+  if (typeof text !== 'string') {
+    return '';
+  }
   let cleaned = text;
 
   // Clean out raw JSON code blocks in text replies

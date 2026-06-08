@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { FarmBackground } from "@/components/FarmTheme";
+import { AIOverview } from "@/components/AIOverview";
 import {
   UserCircle, MapPin, LayoutGrid, Wheat, ShieldCheck,
   ExternalLink, Loader2, Pencil, Check, X, Cpu,
@@ -448,6 +449,8 @@ export default function Profile() {
             Manage your farm profile and discover government schemes
           </p>
         </div>
+
+        <AIOverview page="schemes" />
 
         {/* ── Top stat cards ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14, marginBottom: 24 }}>
