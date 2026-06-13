@@ -374,12 +374,12 @@ export default function MandiRates() {
             <div>
               <h1 style={{
                 fontSize: 30, fontWeight: 800, margin: '0 0 4px',
-                fontFamily: "'Nunito', sans-serif", color: textPrimary,
+                fontFamily: "'Nunito', sans-serif", color: isDark ? '#A8D89A' : '#1B3A20',
               }}>
                 {t('mandi_title')}
               </h1>
               {lastRefresh && (
-                <p style={{ fontSize: 12, color: textSecondary, margin: 0 }}>
+                <p style={{ fontSize: 12, color: isDark ? '#A3B8A8' : '#2C3E30', margin: 0 }}>
                   {t('Last_refreshed')}: {lastRefresh}
                 </p>
               )}

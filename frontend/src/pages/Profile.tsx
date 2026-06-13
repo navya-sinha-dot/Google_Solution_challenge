@@ -549,10 +549,10 @@ export default function Profile() {
 
         {/* ── Page header ── */}
         <div style={{ marginBottom: 28 }}>
-          <h1 style={{ fontSize: 30, fontWeight: 800, margin: '0 0 4px', fontFamily: "'Nunito', sans-serif", color: textPrimary }}>
+          <h1 style={{ fontSize: 30, fontWeight: 800, margin: '0 0 4px', fontFamily: "'Nunito', sans-serif", color: isDark ? '#A8D89A' : '#1B3A20' }}>
             {t('profile_title')}
           </h1>
-          <p style={{ fontSize: 12, color: textSecondary, margin: 0 }}>
+          <p style={{ fontSize: 12, color: isDark ? '#A3B8A8' : '#2C3E30', margin: 0 }}>
             Manage your farm profile and discover government schemes
           </p>
         </div>

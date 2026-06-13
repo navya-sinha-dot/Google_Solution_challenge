@@ -154,7 +154,7 @@ export default function Chat() {
           }}>
              {t.title}
           </h1>
-          <p style={{ fontSize: '15px', color: isDark ? '#6A8A6A' : '#5A7A60' }}>
+          <p style={{ fontSize: '15px', color: isDark ? '#A3B8A8' : '#2C3E30' }}>
             {t.description}
           </p>
         </div>

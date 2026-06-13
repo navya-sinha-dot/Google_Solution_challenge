@@ -206,10 +206,10 @@ export default function FarmersMap() {
         {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
           <div>
-            <h1 className="text-3xl font-bold text-emerald-900 dark:text-emerald-50 font-sans">
+            <h1 className="text-3xl font-bold font-sans" style={{ color: isDark ? '#A8D89A' : '#1B3A20' }}>
               Decentralized Resource Distribution Map
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-sm mt-1" style={{ color: isDark ? '#A3B8A8' : '#2C3E30' }}>
               Visualizing matching hubs and geographical density of agricultural resources.
             </p>
           </div>

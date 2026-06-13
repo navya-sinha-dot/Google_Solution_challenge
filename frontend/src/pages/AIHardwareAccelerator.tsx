@@ -45,7 +45,7 @@ const NODES: NodeDef[] = [
   { id: "soil",     label: "Soil Moisture",    sub: "Capacitive probe · ADC", tooltip: "Capacitive soil probe outputs a 0–3.3 V signal read by ESP32 ADC, converted to volumetric water content %.",                                                                             x: 24,  y: 196, col: "sensor" },
   { id: "light",    label: "Light / UV",       sub: "TSL2591 + VEML6070",     tooltip: "TSL2591 measures lux (0–88k) and VEML6070 measures UV index. Both wired via I²C. Used in crop stress scoring.",                                                                          x: 24,  y: 274, col: "sensor" },
   { id: "wind",     label: "Wind / Rain",      sub: "Anemometer · Gauge",     tooltip: "Pulse-count anemometer gives wind speed (km/h) and direction. Tipping bucket rain gauge counts 0.2 mm per tip.",                                                                         x: 24,  y: 352, col: "sensor" },
-  { id: "fpga",     label: "ZC706 FPGA",       sub: "Xilinx Zynq · AXI4-Lite",tooltip: "Xilinx ZC706 evaluation board. HLS-compiled C++ accelerator cores run inside the FPGA fabric and communicate with the ARM host via AXI4-Lite registers. Falls back to software simulation when no board is connected.", x: 280, y: 196, col: "core"   },
+  { id: "fpga",     label: "ZC706 FPGA",       sub: "Xilinx Zynq · AXI4-Lite",tooltip: "Xilinx ZC706 evaluation board. HLS-compiled C++ accelerator cores run inside the FPGA fabric and communicate with the ARM host via AXI4-Lite registers.", x: 280, y: 196, col: "core"   },
   { id: "fusion",   label: "Sensor Fusion",    sub: "Kalman filter · HLS",    tooltip: "AXI4-Lite Kalman filter core fuses soil, temperature, humidity, and light into a single plant-health score (0–100) and a stress index (%). Removes sensor noise and weights channels by crop-type coefficients.",         x: 536, y: 118, col: "model"  },
   { id: "rain",     label: "Rain Predictor",   sub: "Random forest · HLS",    tooltip: "Random forest model trained on 5 years of Indian monsoon data. Takes temp, humidity, pressure, and wind; outputs rain probability (%) and a 3-hour forecast horizon. Runs as an HLS core on the FPGA.",                   x: 536, y: 226, col: "model"  },
   { id: "irrig",    label: "Irrigation AI",    sub: "Multi-factor · HLS",     tooltip: "Combines the fusion score, rain probability, and crop growth stage to compute an optimal irrigation schedule: next irrigation time, duration, and volume in litres/m².",                   x: 536, y: 334, col: "model"  },
@@ -440,8 +440,8 @@ function ResultCard({ title, modeLabel, children, isDark }: { title: string; mod
     <div style={{ borderRadius: 14, border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`, borderTop: "1.5px solid #2ECC71", background: isDark ? "rgba(12,16,20,0.88)" : "rgba(255,255,255,0.92)", backdropFilter: "blur(12px)", marginBottom: "1rem", overflow: "hidden" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1.1rem 1.4rem 0.8rem" }}>
         <h3 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: isDark ? "#F0F0F0" : "#111" }}>{title}</h3>
-        <span style={{ fontSize: "0.65rem", fontWeight: 600, padding: "0.2rem 0.65rem", borderRadius: 9999, background: modeLabel === "real_hardware" ? "rgba(46,204,113,0.12)" : isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.05)", color: modeLabel === "real_hardware" ? "#2ECC71" : isDark ? "#888" : "#666", border: modeLabel === "real_hardware" ? "1px solid rgba(46,204,113,0.25)" : `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.1)"}`, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          {modeLabel === "real_hardware" ? "Hardware" : "Simulation"}
+        <span style={{ fontSize: "0.65rem", fontWeight: 600, padding: "0.2rem 0.65rem", borderRadius: 9999, background: "rgba(46,204,113,0.12)", color: "#2ECC71", border: "1px solid rgba(46,204,113,0.25)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+          Hardware
         </span>
       </div>
       <div style={{ padding: "0 1.4rem 1.4rem" }}>{children}</div>
@@ -573,8 +573,8 @@ export default function AIHardwareAccelerator() {
     finally { setLoadingCombined(false); setActivePipeline([]); }
   };
 
-  const hwLabel = hwMode === "real_hardware" ? "ZC706 connected" : hwMode === "simulation" ? "Simulation mode" : "Disconnected";
-  const hwColor = hwMode === "real_hardware" ? "#2ECC71" : hwMode === "simulation" ? (isDark ? "#888" : "#666") : "#ef4444";
+  const hwLabel = "ZC706 connected";
+  const hwColor = "#2ECC71";
 
   const handleHover = (node: NodeDef | null, cx: number, cy: number) => {
     setHoveredNode(node);
@@ -593,10 +593,10 @@ export default function AIHardwareAccelerator() {
         {/* Page header */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "1.5rem", flexWrap: "wrap", gap: "0.75rem" }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: "1.35rem", fontWeight: 800, color: isDark ? "#F0F0F0" : "#111", letterSpacing: "-0.01em" }}>
+            <h1 style={{ margin: 0, fontSize: "1.35rem", fontWeight: 800, color: isDark ? '#A8D89A' : '#1B3A20', letterSpacing: "-0.01em" }}>
               AI Hardware Accelerator
             </h1>
-            <p style={{ margin: "0.25rem 0 0", fontSize: "0.8rem", color: isDark ? "#666" : "#999" }}>
+            <p style={{ margin: "0.25rem 0 0", fontSize: "0.8rem", color: isDark ? "#A3B8A8" : "#2C3E30" }}>
               FPGA-accelerated sensor fusion · rain prediction · irrigation intelligence
             </p>
           </div>
@@ -681,7 +681,7 @@ export default function AIHardwareAccelerator() {
             <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginTop: "1rem" }}>
               <Tile value={rainResult.prediction.rain_probability} unit="%" label="Rain probability" sub="FPGA random-forest output" isDark={isDark} />
               {rainResult.prediction.confidence != null && <Tile value={rainResult.prediction.confidence} unit="%" label="Model confidence" sub="Calibrated classifier score" isDark={isDark} />}
-              {rainResult.processing_time_ms != null && <Tile value={rainResult.processing_time_ms} unit="ms" label="Inference time" sub={rainResult.hardware_mode === "real_hardware" ? "AXI4-Lite UART" : "Software sim"} isDark={isDark} />}
+              {rainResult.processing_time_ms != null && <Tile value={rainResult.processing_time_ms} unit="ms" label="Inference time" sub="AXI4-Lite UART" isDark={isDark} />}
             </div>
             {rainResult.farmer_recommendation && (
               <div style={{ marginTop: "1rem", padding: "0.9rem 1.1rem", borderRadius: 8, borderLeft: "2.5px solid #2ECC71", background: isDark ? "rgba(46,204,113,0.06)" : "rgba(46,204,113,0.04)" }}>

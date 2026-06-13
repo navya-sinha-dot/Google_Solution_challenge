@@ -197,11 +197,11 @@ export default function Reports() {
     };
 
     try {
-      await addStep("📡 Establishing connection with edge IoT sensor WS01...", 10);
-      await addStep(`🌡️ Telemetry read: Temp=${sensor.temperature.toFixed(1)}°C, Moisture=${sensor.soil_moisture.toFixed(0)}%`, 25);
+      await addStep("Establishing connection with edge IoT sensor WS01...", 10);
+      await addStep(`Telemetry read: Temp=${sensor.temperature.toFixed(1)}°C, Moisture=${sensor.soil_moisture.toFixed(0)}%`, 25);
 
       if (includeMandi) {
-        await addStep("📈 Querying Postgres Mandi history records index...", 40);
+        await addStep("Querying Postgres Mandi history records index...", 40);
         try {
           const res = await fetch(`${API_BASE}/api/mandi/history?limit=5`);
           if (res.ok) {
@@ -215,7 +215,7 @@ export default function Reports() {
       }
 
       if (includeSchemes) {
-        await addStep("📜 Querying government schemes database explorer...", 60);
+        await addStep("Querying government schemes database explorer...", 60);
         try {
           const res = await fetch(`${API_BASE}/api/schemes`);
           if (res.ok) {
@@ -229,7 +229,7 @@ export default function Reports() {
       }
 
       await addStep("🧠 Synthesizing data prompts and formatting criteria...", 80);
-      await addStep("⚡ Calling Kisan Mitra AI model (Groq pool: category overview)...", 90);
+      await addStep("Calling Kisan Mitra AI model (Groq pool: category overview)...", 90);
 
       // Groq AI call
       const r = await fetch(`${API_BASE}/api/advisor/insights`, {
@@ -251,7 +251,7 @@ export default function Reports() {
       }
 
       setAiAdvice(insights || 'AI analysis complete. Conditions are within normal range.');
-      await addStep("🎉 Farm Intelligence report finalized successfully.", 100, 400);
+      await addStep("Farm Intelligence report finalized successfully.", 100, 400);
 
       setGeneratedAt(new Date().toLocaleString());
       setReportGenerated(true);
@@ -294,15 +294,15 @@ p,span,div,strong{color:#222!important}
   };
 
   const shareToWhatsApp = () => {
-    const intro = `🌾 *AgriSense Farm Intelligence Report* 🌾\n*Date:* ${generatedAt}\n*Format:* ${reportFormat.toUpperCase()}\n\n`;
+    const intro = `*AgriSense Farm Intelligence Report*\n*Date:* ${generatedAt}\n*Format:* ${reportFormat.toUpperCase()}\n\n`;
     const telemetry = includeWeather
-      ? `*Live Telemetry:*\n🌡️ Temp: ${sensor.temperature.toFixed(1)}°C\n💧 Humidity: ${sensor.humidity.toFixed(0)}%\n💨 Wind: ${sensor.wind_speed.toFixed(1)} km/h\n🌱 Soil Moisture: ${sensor.soil_moisture.toFixed(0)}%\n\n`
+      ? `*Live Telemetry:*\nTemp: ${sensor.temperature.toFixed(1)}°C\nHumidity: ${sensor.humidity.toFixed(0)}%\nWind: ${sensor.wind_speed.toFixed(1)} km/h\nSoil Moisture: ${sensor.soil_moisture.toFixed(0)}%\n\n`
       : '';
     
     let alertsText = '';
     if (includeAlerts) {
       const activeAlerts = getAlerts();
-      alertsText = `*Active Alerts:*\n` + activeAlerts.map(a => `${a.severity === 'danger' ? '🔴' : '🟡'} ${a.message} (Action: ${a.action})`).join('\n') + `\n\n`;
+      alertsText = `*Active Alerts:*\n` + activeAlerts.map(a => `[${a.severity === 'danger' ? 'CRITICAL' : 'WARNING'}] ${a.message} (Action: ${a.action})`).join('\n') + `\n\n`;
     }
 
     let mandiText = '';
@@ -410,7 +410,7 @@ p,span,div,strong{color:#222!important}
             <h1 style={{ fontSize: 28, fontWeight: 800, color: isDark ? '#A8D89A' : '#1B3A20', margin: 0 }}>
               {t('reports_title')}
             </h1>
-            <p style={{ fontSize: 13, color: isDark ? '#6A8A6A' : '#5A7A60', margin: 0 }}>
+            <p style={{ fontSize: 13, color: isDark ? '#A3B8A8' : '#2C3E30', margin: 0 }}>
               Build customizable, data-driven agriculture intelligence summaries.
             </p>
           </div>
@@ -437,7 +437,7 @@ p,span,div,strong{color:#222!important}
                   Select which database Explorer logs and active sensor streams you want compiled. Kisan Mitra LLM will structure the report with expert sowing insights and warnings.
                 </p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {['📝 PostgreSQL Logs', '📊 Live Sensors', '📈 Mandi indices', '📜 Welfare Schemes'].map((item, i) => (
+                  {['PostgreSQL Logs', 'Live Sensors', 'Mandi indices', 'Welfare Schemes'].map((item, i) => (
                     <span key={i} style={{
                       fontSize: 11, fontWeight: 700, color: isDark ? '#6A8A6A' : '#5A7A60',
                       padding: '5px 12px', borderRadius: 20,

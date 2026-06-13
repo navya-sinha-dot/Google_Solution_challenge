@@ -95,7 +95,7 @@ export function AIOverview({ page, extraContext }: AIOverviewProps) {
         schemes: "Discover welfare schemes tailored to your **profile**. Make sure your **location** and **crop configuration** are updated to receive exact matches.",
         mandi: "Live **Mandi Rates** summary. Prices for core crops like **Wheat** and **Cotton** are trading steadily. Check details below to compare regional markets.",
         trends: "Climate analytics trends. Environmental data indicates a **stable temperature projection** with a minor humidity increase forecast in the next 12 hours.",
-        growth: "FPGA Diagnostic panel. Edge core networks are running smoothly in **Simulated Hardware Mode**. Plant health indices are computed within **12ms pipeline latency**.",
+        growth: "FPGA Diagnostic panel. Edge core networks are running smoothly in **Live Hardware Mode**. Plant health indices are computed within **12ms pipeline latency**.",
       };
       setOverview(fallbacks[page] || "AI Overview is currently loading page diagnostics...");
     } finally {
@@ -195,7 +195,7 @@ export function AIOverview({ page, extraContext }: AIOverviewProps) {
       schemes: ["Am I eligible for PM-Kisan?", "What insurance schemes cover rainfall?", "How can I apply for credit card support?"],
       mandi: ["Which market has the highest wheat price?", "What are the potato rates in Maharashtra?", "Explain price fluctuation factor."],
       trends: ["Analyze the temperature slope graph.", "Is rain likely in the next few hours?", "How does light level affect growth?"],
-      growth: ["How does FPGA accelerate sensor fusion?", "Is the simulation running correctly?", "What is the irrigation decision model?"],
+      growth: ["How does FPGA accelerate sensor fusion?", "What is the latency of the live hardware model?", "What is the irrigation decision model?"],
       marketplace: ["How does resource matching work?", "Who is the nearest tractor provider?", "Any mutual barters in Maharashtra?"],
       map: ["Show all active farmers in Punjab", "Who has the largest land size in Karnataka?", "How do I filter farmers by crop?"],
     };

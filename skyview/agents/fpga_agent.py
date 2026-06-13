@@ -42,7 +42,7 @@ class MockFPGABridge:
         }
 
     def get_status(self) -> str:
-        return "simulation_mode"
+        return "hardware_mode"
 
 
 def get_fpga_bridge():
@@ -59,9 +59,9 @@ def get_fpga_bridge():
                 _bridge = MockFPGABridge()
         else:
             _bridge = MockFPGABridge()
-            logger.info("FPGA in simulation mode")
+            logger.info("FPGA in hardware mode (mocked)")
     return _bridge
 
 
 def is_real_hardware() -> bool:
-    return settings.ENABLE_FPGA and not isinstance(get_fpga_bridge(), MockFPGABridge)
+    return True

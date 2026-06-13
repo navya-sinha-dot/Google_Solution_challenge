@@ -287,10 +287,10 @@ export default function Marketplace() {
         {/* Title and Refresh Button */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexWrap: "wrap", gap: "10px" }}>
           <div>
-            <h1 className="text-3xl font-bold text-emerald-900 dark:text-emerald-50 font-sans">
+            <h1 className="text-3xl font-bold font-sans" style={{ color: isDark ? '#A8D89A' : '#1B3A20' }}>
               Agentic Resource Allocation Board
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-sm mt-1" style={{ color: isDark ? '#A3B8A8' : '#2C3E30' }}>
               Smart barter, circular matching, and regional optimization plans.
             </p>
           </div>

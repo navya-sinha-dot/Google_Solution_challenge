@@ -58,7 +58,7 @@ export default function HardwareSetup() {
             }}>
               Connect Your Hardware
             </h1>
-            <p style={{ fontSize: '15px', color: textPrimary, maxWidth: '480px', margin: '0 auto', lineHeight: 1.6 }}>
+            <p style={{ fontSize: '15px', color: isDark ? '#A3B8A8' : '#2C3E30', maxWidth: '480px', margin: '0 auto', lineHeight: 1.6 }}>
               To access live sensor data and AI-powered farm intelligence, connect your AgriSense device or get one.
             </p>
           </div>

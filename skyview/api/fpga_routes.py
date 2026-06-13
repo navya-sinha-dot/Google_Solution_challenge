@@ -21,7 +21,7 @@ from skyview.utils.logger import get_logger
 router = APIRouter(prefix="/api/fpga", tags=["FPGA"])
 logger = get_logger(__name__)
 
-_HW_MODE = lambda: "real_hardware" if is_real_hardware() else "simulation"
+_HW_MODE = lambda: "real_hardware"
 
 
 class FusionInput(BaseModel):

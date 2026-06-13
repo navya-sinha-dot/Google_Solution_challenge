@@ -206,7 +206,7 @@ export default function BuyHardware() {
               <p
                 style={{
                   fontSize: "15px",
-                  color: textSecondary,
+                  color: isDark ? '#A3B8A8' : '#2C3E30',
                   lineHeight: 1.7,
                   marginBottom: "28px",
                 }}

@@ -14,6 +14,7 @@ import {
   BarChart3,
   Shuffle,
   Map,
+  Cloud,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
@@ -44,38 +45,13 @@ export function DashboardHeader({
   const navItems = [
     {
       path: '/dashboard',
-      label: 'Home',
+      label: 'Dashboard',
       icon: LayoutDashboard,
     },
     {
       path: '/profile',
-      label: 'Schemes',
+      label: 'Gov Schemes',
       icon: Landmark,
-    },
-    {
-      path: '/mandi',
-      label: 'Mandi',
-      icon: ShoppingBasket,
-    },
-    {
-      path: '/trends',
-      label: 'Trends',
-      icon: TrendingUp,
-    },
-    {
-      path: '/reports',
-      label: 'Reports',
-      icon: FileText,
-    },
-    {
-      path: '/advisor',
-      label: 'AI',
-      icon: Bot,
-    },
-    {
-      path: '/accelerator',
-      label: 'Growth',
-      icon: Rocket,
     },
     {
       path: '/marketplace',
@@ -88,8 +64,33 @@ export function DashboardHeader({
       icon: Map,
     },
     {
+      path: '/reports',
+      label: 'Reports',
+      icon: FileText,
+    },
+    {
+      path: '/advisor',
+      label: 'Farm Advisor',
+      icon: Bot,
+    },
+    {
+      path: '/accelerator',
+      label: 'AI Accelerator',
+      icon: Rocket,
+    },
+    {
+      path: '/mandi',
+      label: 'Mandi',
+      icon: ShoppingBasket,
+    },
+    {
+      path: '/trends',
+      label: 'Trends',
+      icon: TrendingUp,
+    },
+    {
       path: '/overview',
-      label: 'Overview',
+      label: 'System Overview',
       icon: BarChart3,
     },
   ];
@@ -134,10 +135,10 @@ export function DashboardHeader({
         <div
           style={{
             height: '100%',
-            padding: '0 18px',
+            padding: '0 12px',
             display: 'flex',
             alignItems: 'center',
-            gap: '16px',
+            gap: '10px',
           }}
         >
           <Link
@@ -145,30 +146,44 @@ export function DashboardHeader({
             style={{
               display: 'flex',
               alignItems: 'center',
+              gap: '8px',
               textDecoration: 'none',
               flexShrink: 0,
             }}
           >
-            <img
-              src="/logo.png"
-              alt="SkyView"
+            <div
               style={{
-                height: '52px',        // was 44px
-                width: 'auto',
-                objectFit: 'contain',
-                display: 'block',
-                filter: isDark
-                  ? 'none'
-                  : 'drop-shadow(0 1px 3px rgba(0,0,0,0.18))',  // visibility on light bg
+                width: '32px',
+                height: '32px',
+                borderRadius: '8px',
+                background: '#10B981',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#ffffff',
               }}
-            />
+            >
+              <Cloud size={18} fill="#ffffff" strokeWidth={0} />
+            </div>
+            <span
+              style={{
+                fontSize: '15px',
+                fontWeight: 800,
+                color: isDark ? '#ffffff' : '#0f172a',
+                letterSpacing: '-0.02em',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              SkyView{' '}
+              <span style={{ color: '#10B981', fontWeight: 800 }}>AI</span>
+            </span>
           </Link>
 
           <nav
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
+              gap: '6px',
               flex: 1,
               minWidth: 0,
               overflowX: 'auto',
@@ -177,7 +192,7 @@ export function DashboardHeader({
           >
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;
-              const Icon = item.icon;
+              const words = item.label.split(' ');
 
               return (
                 <Link
@@ -185,35 +200,44 @@ export function DashboardHeader({
                   to={item.path}
                   style={{
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '6px',              // was 5px
-                    padding: '9px 13px',     // was 8px 11px
-                    borderRadius: '11px',
+                    justifyContent: 'center',
+                    padding: '6px 14px',
+                    borderRadius: '10px',
                     textDecoration: 'none',
                     whiteSpace: 'nowrap',
-                    fontSize: '13px',        // was 11px
-                    fontWeight: isActive ? 700 : 500,
+                    fontSize: '12.5px',
+                    lineHeight: '1.2',
+                    fontWeight: isActive ? 700 : 600,
                     flexShrink: 0,
                     transition: 'all 0.25s ease',
+                    textAlign: 'center',
                     color: isActive
                       ? isDark
                         ? '#ffffff'
                         : '#0f172a'
                       : isDark
-                        ? 'rgba(255,255,255,0.60)'
-                        : 'rgba(15,23,42,0.60)',
+                        ? 'rgba(255,255,255,0.55)'
+                        : 'rgba(15,23,42,0.55)',
                     background: isActive
                       ? isDark
-                        ? 'rgba(16,185,129,0.14)'
-                        : 'rgba(16,185,129,0.10)'
+                        ? 'rgba(255,255,255,0.1)'
+                        : '#ffffff'
                       : 'transparent',
+                    boxShadow: isActive && !isDark
+                      ? '0 2px 8px rgba(0,0,0,0.06)'
+                      : 'none',
                     border: isActive
-                      ? '1px solid rgba(16,185,129,0.20)'
+                      ? isDark
+                        ? '1px solid rgba(255,255,255,0.08)'
+                        : '1px solid rgba(0,0,0,0.04)'
                       : '1px solid transparent',
                   }}
                 >
-                  <Icon size={15} />         {/* was 13 */}
-                  {item.label}
+                  {words.map((word, wIdx) => (
+                    <span key={wIdx} style={{ display: 'block' }}>{word}</span>
+                  ))}
                 </Link>
               );
             })}
@@ -223,7 +247,7 @@ export function DashboardHeader({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
+              gap: '6px',
               flexShrink: 0,
             }}
           >
@@ -232,30 +256,51 @@ export function DashboardHeader({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                padding: '6px 10px',
-                borderRadius: '999px',
-                background: sensorNodeOnline
-                  ? 'rgba(16,185,129,0.08)'
-                  : 'rgba(239,68,68,0.08)',
+                flexShrink: 0,
               }}
             >
               <div
                 style={{
-                  width: '7px',
-                  height: '7px',
-                  borderRadius: '50%',
-                  background: sensorNodeOnline ? '#10B981' : '#EF4444',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '4px 10px',
+                  borderRadius: '999px',
+                  background: sensorNodeOnline
+                    ? 'rgba(16,185,129,0.12)'
+                    : 'rgba(239,68,68,0.12)',
                 }}
-              />
+              >
+                <div
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: sensorNodeOnline ? '#10B981' : '#EF4444',
+                  }}
+                />
+
+                <span
+                  style={{
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    color: sensorNodeOnline ? '#10B981' : '#EF4444',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {sensorNodeOnline ? 'Active' : 'Offline'}
+                </span>
+              </div>
 
               <span
                 style={{
                   fontSize: '10px',
                   fontWeight: 700,
-                  color: sensorNodeOnline ? '#10B981' : '#EF4444',
+                  color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(15,23,42,0.4)',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                {lastUpdateSeconds}s
+                L-SYNC 0s
               </span>
             </div>
 

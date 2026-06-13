@@ -280,7 +280,9 @@ function AdvisorActionCard({ process, data, isDark }: { process: string; data: a
         <div style={{ fontSize: 10, fontWeight: 800, color: '#2ECC71', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Sowing Suitability Suggestions</div>
         {insights.map((item: any, i: number) => (
           <div key={i} style={{ display: 'flex', gap: 8, paddingBottom: 4, borderBottom: i < insights.length - 1 ? `1px solid ${isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)'}` : 'none' }}>
-            <span style={{ fontSize: 16 }}>{item.emoji || '🌱'}</span>
+            <div style={{ marginTop: '2px', color: '#10B981' }}>
+              <Sprout size={16} />
+            </div>
             <div>
               <p style={{ fontSize: 11, fontWeight: 700, color: isDark ? '#D4EDDA' : '#142A1A', margin: 0 }}>{item.crop}</p>
               <p style={{ fontSize: 9, color: '#2ECC71', margin: '1px 0' }}>Timeline: {item.timeline}</p>
@@ -685,10 +687,10 @@ export default function Advisor() {
   };
 
   const activeSuggestChips = [
-    { text: "🌾 Suggest best crops for my soil", label: language === 'hi' ? "फसलों की सिफारिश" : "Suggest sowing crops" },
-    { text: "📈 Latest mandi rates for wheat", label: language === 'hi' ? "गेहूं का मंडी भाव" : "Mandi rates for wheat" },
-    { text: "🌦️ Current weather & soil status", label: language === 'hi' ? "मौसम और मिट्टी की स्थिति" : "Weather & soil status" },
-    { text: "📜 Government schemes for my farm", label: language === 'hi' ? "सरकारी कृषि योजनाएं" : "Government schemes" }
+    { text: "Suggest best crops for my soil", label: language === 'hi' ? "फसलों की सिफारिश" : "Suggest sowing crops" },
+    { text: "Latest mandi rates for wheat", label: language === 'hi' ? "गेहूं का मंडी भाव" : "Mandi rates for wheat" },
+    { text: "Current weather & soil status", label: language === 'hi' ? "मौसम और मिट्टी की स्थिति" : "Weather & soil status" },
+    { text: "Government schemes for my farm", label: language === 'hi' ? "सरकारी कृषि योजनाएं" : "Government schemes" }
   ];
 
   // Client-side parser for AI overview in case it was packed in raw text JSON
@@ -725,10 +727,10 @@ export default function Advisor() {
         
         {/* Page Title & Subtitle */}
         <div style={{ marginBottom: 28, textAlign: "center" }}>
-          <h1 style={{ fontSize: 30, fontWeight: 800, fontFamily: "'Nunito', sans-serif", color: isDark ? "#A8D89A" : "#0a1c0dff", marginBottom: 6 }}>
+          <h1 style={{ fontSize: 30, fontWeight: 800, fontFamily: "'Nunito', sans-serif", color: isDark ? '#A8D89A' : '#1B3A20', marginBottom: 6 }}>
             {t('advisor_title')}
           </h1>
-          <p style={{ fontSize: 14, color: isDark ? "#6A8A6A" : "#5A7A60", maxWidth: "600px", margin: "0 auto" }}>
+          <p style={{ fontSize: 14, color: isDark ? '#A3B8A8' : '#2C3E30', maxWidth: "600px", margin: "0 auto" }}>
             {t('advisor_subtitle')}
           </p>
         </div>

@@ -27,7 +27,7 @@ export function LanguageSelector() {
   return (
     <div className="notranslate" translate="no">
       <Select value={language} onValueChange={(v) => setLanguage(v as any)}>
-        <SelectTrigger className="w-[130px] bg-card border-border">
+        <SelectTrigger className="w-[115px] bg-card border-border">
           <Globe className="w-4 h-4 mr-2 text-muted-foreground" />
           <SelectValue />
         </SelectTrigger>

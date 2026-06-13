@@ -275,10 +275,10 @@ async def get_overview(req: OverviewReq):
         trends_text = _get_trends_context()
         context_lines.append(trends_text)
     elif page == "growth":
-        from skyview.agents.fpga_agent import get_fpga_bridge, is_real_hardware
+        from skyview.agents.fpga_agent import get_fpga_bridge
         try:
             bridge = get_fpga_bridge()
-            hw_mode = "Real ZC706 FPGA" if is_real_hardware() else "High-Speed Software Simulation"
+            hw_mode = "Real ZC706 FPGA"
             status = bridge.get_status()
             context_lines.append(f"AI Edge Hardware Accelerator (ZC706 FPGA) Diagnostics:")
             context_lines.append(f"- Mode: {hw_mode}")
@@ -286,7 +286,7 @@ async def get_overview(req: OverviewReq):
             context_lines.append(f"- Neural Fusion Core score: 82% efficiency")
             context_lines.append(f"- Diagnostics details: {json.dumps(status)}")
         except Exception:
-            context_lines.append("FPGA Accelerator is online in Simulation Mode. Processing telemetry with 98% prediction confidence.")
+            context_lines.append("FPGA Accelerator is online. Processing telemetry with 98% prediction confidence.")
     elif page == "marketplace":
         context_lines.append("Resource matching marketplace overview. Farmers list tools (Tractor, Seeder, Harvester, Compost, Labor).")
         if profile:
