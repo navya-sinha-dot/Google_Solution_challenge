@@ -317,6 +317,17 @@ export default function Profile() {
     crops:           localStorage.getItem("user_crops")
       ? localStorage.getItem("user_crops")!.split(",").map(c => c.trim()).filter(Boolean)
       : [],
+    latitude:        localStorage.getItem("user_latitude") || "",
+    longitude:       localStorage.getItem("user_longitude") || "",
+    state:           localStorage.getItem("user_state") || "",
+    district:        localStorage.getItem("user_district") || "",
+    excess_resources: localStorage.getItem("user_excess_resources")
+      ? localStorage.getItem("user_excess_resources")!.split(",").map(c => c.trim()).filter(Boolean)
+      : [],
+    required_resources: localStorage.getItem("user_required_resources")
+      ? localStorage.getItem("user_required_resources")!.split(",").map(c => c.trim()).filter(Boolean)
+      : [],
+    whatsapp_number:  localStorage.getItem("user_whatsapp_number") || "",
   };
 
   const { data: profileData = cachedProfile } = useQuery({
@@ -328,14 +339,36 @@ export default function Profile() {
       const data = await res.json();
       if (data.status === "success" && data.profile) {
         const p = data.profile;
-        const cropsList = p.crops?.length
-          ? p.crops
-          : (localStorage.getItem("user_crops") || "").split(",").map((c: string) => c.trim()).filter(Boolean);
+        const cropsList = p.crops?.length ? p.crops : [];
+        const excessList = p.excess_resources?.length ? p.excess_resources : [];
+        const requiredList = p.required_resources?.length ? p.required_resources : [];
+
         if (p.name)            localStorage.setItem("user_name", p.name);
         if (p.land_size_acres) localStorage.setItem("user_land_size", String(p.land_size_acres));
         if (p.location)        localStorage.setItem("user_location", p.location);
         if (cropsList?.length) localStorage.setItem("user_crops", cropsList.join(", "));
-        return { name: p.name || "", land_size_acres: String(p.land_size_acres || ""), location: p.location || "", crops: cropsList };
+        
+        localStorage.setItem("user_latitude", p.latitude ? String(p.latitude) : "");
+        localStorage.setItem("user_longitude", p.longitude ? String(p.longitude) : "");
+        localStorage.setItem("user_state", p.state || "");
+        localStorage.setItem("user_district", p.district || "");
+        localStorage.setItem("user_excess_resources", excessList.join(", "));
+        localStorage.setItem("user_required_resources", requiredList.join(", "));
+        localStorage.setItem("user_whatsapp_number", p.whatsapp_number || "");
+
+        return {
+          name: p.name || "",
+          land_size_acres: String(p.land_size_acres || ""),
+          location: p.location || "",
+          crops: cropsList,
+          latitude: p.latitude ? String(p.latitude) : "",
+          longitude: p.longitude ? String(p.longitude) : "",
+          state: p.state || "",
+          district: p.district || "",
+          excess_resources: excessList,
+          required_resources: requiredList,
+          whatsapp_number: p.whatsapp_number || "",
+        };
       }
       return cachedProfile;
     },
@@ -344,7 +377,19 @@ export default function Profile() {
   });
 
   const [editing, setEditing]   = useState(false);
-  const [editForm, setEditForm] = useState({ name: "", land_size_acres: "", location: "", crops: "" });
+  const [editForm, setEditForm] = useState({
+    name: "",
+    land_size_acres: "",
+    location: "",
+    crops: "",
+    latitude: "",
+    longitude: "",
+    state: "",
+    district: "",
+    excess_resources: "",
+    required_resources: "",
+    whatsapp_number: "",
+  });
   const [saving, setSaving]     = useState(false);
   const [hwConnecting, setHwConnecting] = useState(false);
   const { toast } = useToast();
@@ -396,26 +441,88 @@ export default function Profile() {
       land_size_acres: profileData.land_size_acres,
       location:        profileData.location,
       crops:           profileData.crops.join(", "),
+      latitude:        profileData.latitude,
+      longitude:       profileData.longitude,
+      state:           profileData.state,
+      district:        profileData.district,
+      excess_resources: profileData.excess_resources.join(", "),
+      required_resources: profileData.required_resources.join(", "),
+      whatsapp_number: profileData.whatsapp_number,
     });
     setEditing(true);
+  };
+
+  const getGeolocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setEditForm(f => ({
+            ...f,
+            latitude: position.coords.latitude.toFixed(6),
+            longitude: position.coords.longitude.toFixed(6),
+          }));
+          toast({ title: "Coordinates Acquired", description: `Lat: ${position.coords.latitude.toFixed(4)}, Lon: ${position.coords.longitude.toFixed(4)}` });
+        },
+        () => {
+          toast({ title: "Geolocation Failed", description: "Please enter coordinates manually.", variant: "destructive" });
+        }
+      );
+    } else {
+      toast({ title: "Unsupported", description: "Geolocation is not supported by your browser.", variant: "destructive" });
+    }
   };
 
   const saveProfile = async () => {
     setSaving(true);
     const cropsArr = editForm.crops.split(",").map(c => c.trim()).filter(Boolean);
+    const excessArr = editForm.excess_resources.split(",").map(c => c.trim()).filter(Boolean);
+    const requiredArr = editForm.required_resources.split(",").map(c => c.trim()).filter(Boolean);
+
     localStorage.setItem("user_name", editForm.name);
     localStorage.setItem("user_land_size", editForm.land_size_acres);
     localStorage.setItem("user_location", editForm.location);
     localStorage.setItem("user_crops", editForm.crops);
-    queryClient.setQueryData(['profile', phone], {
-      name: editForm.name, land_size_acres: editForm.land_size_acres,
-      location: editForm.location, crops: cropsArr,
-    });
+    localStorage.setItem("user_latitude", editForm.latitude);
+    localStorage.setItem("user_longitude", editForm.longitude);
+    localStorage.setItem("user_state", editForm.state);
+    localStorage.setItem("user_district", editForm.district);
+    localStorage.setItem("user_excess_resources", editForm.excess_resources);
+    localStorage.setItem("user_required_resources", editForm.required_resources);
+    localStorage.setItem("user_whatsapp_number", editForm.whatsapp_number);
+
+    const updatedProfile = {
+      name: editForm.name,
+      land_size_acres: editForm.land_size_acres,
+      location: editForm.location,
+      crops: cropsArr,
+      latitude: editForm.latitude,
+      longitude: editForm.longitude,
+      state: editForm.state,
+      district: editForm.district,
+      excess_resources: excessArr,
+      required_resources: requiredArr,
+      whatsapp_number: editForm.whatsapp_number,
+    };
+
+    queryClient.setQueryData(['profile', phone], updatedProfile);
     setEditing(false);
     try {
       await fetch(`${API_URL}/api/profile/save`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editForm.name, phone, land_size_acres: editForm.land_size_acres, location: editForm.location, crops: cropsArr }),
+        body: JSON.stringify({
+          name: editForm.name,
+          phone,
+          land_size_acres: editForm.land_size_acres ? parseFloat(editForm.land_size_acres) : null,
+          location: editForm.location,
+          crops: cropsArr,
+          latitude: editForm.latitude ? parseFloat(editForm.latitude) : null,
+          longitude: editForm.longitude ? parseFloat(editForm.longitude) : null,
+          state: editForm.state,
+          district: editForm.district,
+          excess_resources: excessArr,
+          required_resources: requiredArr,
+          whatsapp_number: editForm.whatsapp_number,
+        }),
       });
       toast({ title: "Profile saved", description: "Your details have been updated." });
     } catch {
@@ -490,9 +597,29 @@ export default function Profile() {
                 <div>
                   <FieldInput label="Full Name"   value={editForm.name}            onChange={v => setEditForm(f => ({ ...f, name: v }))}            placeholder="e.g. Rajan Kumar"     isDark={isDark} />
                   <FieldInput label="Land (Acres)"value={editForm.land_size_acres} onChange={v => setEditForm(f => ({ ...f, land_size_acres: v }))} placeholder="e.g. 5.5"            isDark={isDark} />
-                  <FieldInput label="Location"    value={editForm.location}         onChange={v => setEditForm(f => ({ ...f, location: v }))}         placeholder="e.g. Maharashtra"    isDark={isDark} />
-                  <FieldInput label="Crops"       value={editForm.crops}            onChange={v => setEditForm(f => ({ ...f, crops: v }))}            placeholder="e.g. Wheat, Rice"    isDark={isDark} />
-                  <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                  <FieldInput label="Location (Details)" value={editForm.location} onChange={v => setEditForm(f => ({ ...f, location: v }))}         placeholder="e.g. Pune, Maharashtra" isDark={isDark} />
+                  <FieldInput label="State"       value={editForm.state}           onChange={v => setEditForm(f => ({ ...f, state: v }))}           placeholder="e.g. Maharashtra" isDark={isDark} />
+                  <FieldInput label="District"    value={editForm.district}        onChange={v => setEditForm(f => ({ ...f, district: v }))}        placeholder="e.g. Pune" isDark={isDark} />
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'end' }}>
+                    <div style={{ flex: 1 }}><FieldInput label="Latitude" value={editForm.latitude} onChange={v => setEditForm(f => ({ ...f, latitude: v }))} placeholder="e.g. 18.5204" isDark={isDark} /></div>
+                    <div style={{ flex: 1 }}><FieldInput label="Longitude" value={editForm.longitude} onChange={v => setEditForm(f => ({ ...f, longitude: v }))} placeholder="e.g. 73.8567" isDark={isDark} /></div>
+                  </div>
+                  <button
+                    onClick={getGeolocation}
+                    type="button"
+                    style={{
+                      width: '100%', marginBottom: 14, background: 'rgba(46,204,113,0.12)', border: '1px solid rgba(46,204,113,0.25)',
+                      borderRadius: 10, padding: '8px 10px', fontSize: 12, fontWeight: 700, color: '#2ECC71', cursor: 'pointer',
+                    }}
+                  >
+                    📍 Get Current GPS Location
+                  </button>
+                  <FieldInput label="Crops Grown" value={editForm.crops}            onChange={v => setEditForm(f => ({ ...f, crops: v }))}            placeholder="e.g. Wheat, Rice"    isDark={isDark} />
+                  <FieldInput label="Excess Resources (To Rent/Share)" value={editForm.excess_resources} onChange={v => setEditForm(f => ({ ...f, excess_resources: v }))} placeholder="e.g. Tractor, Labor" isDark={isDark} />
+                  <FieldInput label="Required Resources (To Find)" value={editForm.required_resources} onChange={v => setEditForm(f => ({ ...f, required_resources: v }))} placeholder="e.g. Harvester, Compost" isDark={isDark} />
+                  <FieldInput label="WhatsApp / Contact Number" value={editForm.whatsapp_number} onChange={v => setEditForm(f => ({ ...f, whatsapp_number: v }))} placeholder="e.g. +919011012345" isDark={isDark} />
+                  
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                     <PrimaryBtn onClick={saveProfile} disabled={saving}>
                       {saving ? <Loader2 size={15} style={{ animation: 'profile-spin 1s linear infinite' }} /> : <Check size={15} />}
                       {saving ? 'Saving…' : 'Save'}
@@ -507,7 +634,12 @@ export default function Profile() {
                   <FieldRow label="Full Name"   icon={<UserCircle size={15} />} value={profileData.name}                              onAdd={startEdit} isDark={isDark} />
                   <FieldRow label="Land Size"   icon={<LayoutGrid size={15} />} value={profileData.land_size_acres ? `${profileData.land_size_acres} Acres` : ''} onAdd={startEdit} isDark={isDark} />
                   <FieldRow label="Location"    icon={<MapPin size={15} />}     value={profileData.location}                          onAdd={startEdit} isDark={isDark} />
+                  <FieldRow label="State / District" icon={<MapPin size={15} />} value={profileData.state ? `${profileData.state} / ${profileData.district || '—'}` : ''} onAdd={startEdit} isDark={isDark} />
                   <FieldRow label="Crops Grown" icon={<Wheat size={15} />}      value={profileData.crops.join(', ')}                  onAdd={startEdit} isDark={isDark} />
+                  <FieldRow label="Coordinates" icon={<MapPin size={15} />}     value={profileData.latitude ? `Lat: ${profileData.latitude}, Lon: ${profileData.longitude}` : ''} onAdd={startEdit} isDark={isDark} />
+                  <FieldRow label="Available Excess" icon={<Check size={15} />} value={profileData.excess_resources.join(', ')}       onAdd={startEdit} isDark={isDark} />
+                  <FieldRow label="Needs / Required" icon={<X size={15} />}     value={profileData.required_resources.join(', ')}     onAdd={startEdit} isDark={isDark} />
+                  <FieldRow label="WhatsApp"    icon={<PhoneCall size={15} />}  value={profileData.whatsapp_number}                   onAdd={startEdit} isDark={isDark} />
                 </>
               )}
             </div>

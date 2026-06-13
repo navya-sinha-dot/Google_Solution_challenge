@@ -12,6 +12,8 @@ import {
   Bot,
   Rocket,
   BarChart3,
+  Shuffle,
+  Map,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
@@ -74,6 +76,16 @@ export function DashboardHeader({
       path: '/accelerator',
       label: 'Growth',
       icon: Rocket,
+    },
+    {
+      path: '/marketplace',
+      label: 'Marketplace',
+      icon: Shuffle,
+    },
+    {
+      path: '/map',
+      label: 'Map',
+      icon: Map,
     },
     {
       path: '/overview',

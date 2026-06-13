@@ -6,7 +6,7 @@ GET  /api/schemes                 - full government scheme catalog
 GET  /api/schemes/recommendations - government scheme recommendations
 """
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -271,7 +271,14 @@ class ProfileSaveReq(BaseModel):
     name: Optional[str] = None
     land_size_acres: Optional[float] = None
     location: Optional[str] = None
-    crops: Optional[str] = None
+    crops: Optional[Union[str, List[str]]] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    state: Optional[str] = None
+    district: Optional[str] = None
+    excess_resources: Optional[Union[str, List[str]]] = None
+    required_resources: Optional[Union[str, List[str]]] = None
+    whatsapp_number: Optional[str] = None
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -285,45 +292,104 @@ def get_profile(phone: str):
     db = get_session()
     try:
         row = db.execute(
-            text("SELECT phone, name, land_size_acres, location, crops FROM users WHERE phone = :p"),
+            text("""
+                SELECT phone, name, land_size_acres, location, crops,
+                       latitude, longitude, state, district,
+                       excess_resources, required_resources, whatsapp_number
+                FROM users
+                WHERE phone = :p
+            """),
             {"p": phone},
         ).fetchone()
     finally:
         db.close()
 
     if not row:
-        raise HTTPException(404, "Profile not found")
+        return {
+            "status": "error",
+            "message": "Profile not found"
+        }
 
     return {
-        "phone": row[0],
-        "name": row[1],
-        "land_size_acres": row[2],
-        "location": row[3],
-        "crops": row[4],
+        "status": "success",
+        "profile": {
+            "phone": row[0],
+            "name": row[1],
+            "land_size_acres": row[2],
+            "location": row[3],
+            "crops": [c.strip() for c in row[4].split(",") if c.strip()] if row[4] else [],
+            "latitude": row[5],
+            "longitude": row[6],
+            "state": row[7],
+            "district": row[8],
+            "excess_resources": [r.strip() for r in row[9].split(",") if r.strip()] if row[9] else [],
+            "required_resources": [r.strip() for r in row[10].split(",") if r.strip()] if row[10] else [],
+            "whatsapp_number": row[11],
+        }
     }
 
 
 @router.post("/api/profile/save")
 async def save_profile(req: ProfileSaveReq):
     """Create or update a farmer profile."""
+    # Convert lists to comma-separated strings
+    crops_str = None
+    if req.crops is not None:
+        if isinstance(req.crops, list):
+            crops_str = ", ".join(str(c) for c in req.crops)
+        else:
+            crops_str = str(req.crops)
+
+    excess_str = None
+    if req.excess_resources is not None:
+        if isinstance(req.excess_resources, list):
+            excess_str = ", ".join(str(e) for e in req.excess_resources)
+        else:
+            excess_str = str(req.excess_resources)
+
+    required_str = None
+    if req.required_resources is not None:
+        if isinstance(req.required_resources, list):
+            required_str = ", ".join(str(r) for r in req.required_resources)
+        else:
+            required_str = str(req.required_resources)
+
     db = get_session()
     try:
         db.execute(
             text("""
-                INSERT INTO users (phone, name, land_size_acres, location, crops)
-                VALUES (:phone, :name, :land, :location, :crops)
+                INSERT INTO users (phone, name, land_size_acres, location, crops,
+                                   latitude, longitude, state, district,
+                                   excess_resources, required_resources, whatsapp_number)
+                VALUES (:phone, :name, :land, :location, :crops,
+                        :latitude, :longitude, :state, :district,
+                        :excess_resources, :required_resources, :whatsapp_number)
                 ON CONFLICT (phone) DO UPDATE SET
-                    name           = COALESCE(EXCLUDED.name, users.name),
-                    land_size_acres = COALESCE(EXCLUDED.land_size_acres, users.land_size_acres),
-                    location       = COALESCE(EXCLUDED.location, users.location),
-                    crops          = COALESCE(EXCLUDED.crops, users.crops)
+                    name               = COALESCE(EXCLUDED.name, users.name),
+                    land_size_acres    = COALESCE(EXCLUDED.land_size_acres, users.land_size_acres),
+                    location           = COALESCE(EXCLUDED.location, users.location),
+                    crops              = COALESCE(EXCLUDED.crops, users.crops),
+                    latitude           = COALESCE(EXCLUDED.latitude, users.latitude),
+                    longitude          = COALESCE(EXCLUDED.longitude, users.longitude),
+                    state              = COALESCE(EXCLUDED.state, users.state),
+                    district           = COALESCE(EXCLUDED.district, users.district),
+                    excess_resources   = COALESCE(EXCLUDED.excess_resources, users.excess_resources),
+                    required_resources = COALESCE(EXCLUDED.required_resources, users.required_resources),
+                    whatsapp_number    = COALESCE(EXCLUDED.whatsapp_number, users.whatsapp_number)
             """),
             {
-                "phone":    req.phone,
-                "name":     req.name,
-                "land":     req.land_size_acres,
-                "location": req.location,
-                "crops":    req.crops,
+                "phone":              req.phone,
+                "name":               req.name,
+                "land":               req.land_size_acres,
+                "location":           req.location,
+                "crops":              crops_str,
+                "latitude":           req.latitude,
+                "longitude":          req.longitude,
+                "state":              req.state,
+                "district":           req.district,
+                "excess_resources":   excess_str,
+                "required_resources": required_str,
+                "whatsapp_number":    req.whatsapp_number,
             },
         )
         db.commit()

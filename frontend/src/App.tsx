@@ -24,6 +24,8 @@ import NotFound from "./pages/NotFound";
 import Profile from "./pages/Profile";
 import HardwareSetup from "./pages/HardwareSetup";
 import BuyHardware from "./pages/BuyHardware";
+import Marketplace from "./pages/Marketplace";
+import FarmersMap from "./pages/FarmersMap";
 
 import { ThemeProvider } from "next-themes";
 
@@ -323,6 +325,26 @@ const AppContent = () => {
             <ProtectedRoute>
               <HardwareGate>
                 <DatabaseExplorer />
+              </HardwareGate>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/marketplace"
+          element={
+            <ProtectedRoute>
+              <HardwareGate>
+                <Marketplace />
+              </HardwareGate>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/map"
+          element={
+            <ProtectedRoute>
+              <HardwareGate>
+                <FarmersMap />
               </HardwareGate>
             </ProtectedRoute>
           }

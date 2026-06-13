@@ -25,7 +25,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 interface AIOverviewProps {
-  page: 'dashboard' | 'schemes' | 'mandi' | 'trends' | 'growth';
+  page: 'dashboard' | 'schemes' | 'mandi' | 'trends' | 'growth' | 'marketplace' | 'map';
   extraContext?: any;
 }
 
@@ -196,6 +196,8 @@ export function AIOverview({ page, extraContext }: AIOverviewProps) {
       mandi: ["Which market has the highest wheat price?", "What are the potato rates in Maharashtra?", "Explain price fluctuation factor."],
       trends: ["Analyze the temperature slope graph.", "Is rain likely in the next few hours?", "How does light level affect growth?"],
       growth: ["How does FPGA accelerate sensor fusion?", "Is the simulation running correctly?", "What is the irrigation decision model?"],
+      marketplace: ["How does resource matching work?", "Who is the nearest tractor provider?", "Any mutual barters in Maharashtra?"],
+      map: ["Show all active farmers in Punjab", "Who has the largest land size in Karnataka?", "How do I filter farmers by crop?"],
     };
     return chips[page] || ["Give me farming tips.", "Tell me more about this page."];
   };
@@ -227,6 +229,16 @@ export function AIOverview({ page, extraContext }: AIOverviewProps) {
         { title: 'View Diagnostics Logs', desc: 'Read internal neural pipeline latency metrics.', icon: Info, action: 'diagnose' },
         { title: 'Manage setup', desc: 'Setup hardware pairing config.', icon: Landmark, action: 'navigate_setup' },
       ],
+      marketplace: [
+        { title: 'View Mutual Matches', desc: 'Filter resources for mutual barter exchanges.', icon: Activity, action: 'filter_mutual' },
+        { title: 'Update My Listings', desc: 'List your excess and required tools.', icon: Landmark, action: 'navigate_profile' },
+        { title: 'Explore Map View', desc: 'See geographical distribution of resources.', icon: TrendingUp, action: 'navigate_map' },
+      ],
+      map: [
+        { title: 'Open Marketplace', desc: 'Go to matching resource boards.', icon: Landmark, action: 'navigate_marketplace' },
+        { title: 'Focus Maharashtra Hub', desc: 'Zoom map into high-density Maharashtra farmer clusters.', icon: Activity, action: 'focus_maharashtra' },
+        { title: 'Focus Punjab Hub', desc: 'Zoom map into high-density Punjab grain-belt clusters.', icon: Activity, action: 'focus_punjab' },
+      ],
     };
     return cards[page] || [];
   };
@@ -248,6 +260,17 @@ export function AIOverview({ page, extraContext }: AIOverviewProps) {
       case 'navigate_db': window.location.href = '/db'; break;
       case 'navigate_profile': window.location.href = '/profile'; break;
       case 'navigate_setup': window.location.href = '/hardware-setup'; break;
+      case 'navigate_marketplace': window.location.href = '/marketplace'; break;
+      case 'navigate_map': window.location.href = '/map'; break;
+      case 'filter_mutual':
+        window.dispatchEvent(new CustomEvent('filter-marketplace', { detail: 'mutual' }));
+        break;
+      case 'focus_maharashtra':
+        window.dispatchEvent(new CustomEvent('map-focus', { detail: { lat: 19.6015, lon: 75.5529, zoom: 7 } }));
+        break;
+      case 'focus_punjab':
+        window.dispatchEvent(new CustomEvent('map-focus', { detail: { lat: 31.1471, lon: 75.3412, zoom: 8 } }));
+        break;
       case 'diagnose':
         alert('Diagnostics: ZC706 Neural Fusion running at 98.7% accuracy. Memory buffer loaded, throughput: 420 inferences/second.');
         break;

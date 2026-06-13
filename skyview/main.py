@@ -57,6 +57,23 @@ def on_startup():
             )
         """))
         db.commit()
+
+        # Add new marketplace/geographic columns if they don't exist
+        for col, col_type in [
+            ("latitude", "DOUBLE PRECISION"),
+            ("longitude", "DOUBLE PRECISION"),
+            ("state", "VARCHAR(100)"),
+            ("district", "VARCHAR(100)"),
+            ("excess_resources", "TEXT"),
+            ("required_resources", "TEXT"),
+            ("whatsapp_number", "VARCHAR(20)")
+        ]:
+            try:
+                db.execute(text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {col_type}"))
+                db.commit()
+            except Exception as col_exc:
+                logger.warning("Could not add column %s to users: %s", col, col_exc)
+
         db.close()
     except Exception as exc:
         logger.warning("Users table check: %s", exc)

@@ -6,7 +6,7 @@ POST /api/agriculture/qa    — structured farm Q&A
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel
@@ -244,7 +244,6 @@ async def get_overview(req: OverviewReq):
     profile = _get_user_profile(user_phone) if user_phone else None
     user_state = profile.get("location", "India") if profile else "India"
     
-    from typing import List
     user_crops: List[str] = [c.strip() for c in profile.get("crops", "").split(",") if c.strip()] if profile and profile.get("crops") else ["Wheat", "Rice"]
 
     context_lines = []
@@ -288,6 +287,16 @@ async def get_overview(req: OverviewReq):
             context_lines.append(f"- Diagnostics details: {json.dumps(status)}")
         except Exception:
             context_lines.append("FPGA Accelerator is online in Simulation Mode. Processing telemetry with 98% prediction confidence.")
+    elif page == "marketplace":
+        context_lines.append("Resource matching marketplace overview. Farmers list tools (Tractor, Seeder, Harvester, Compost, Labor).")
+        if profile:
+            context_lines.append(f"Farmer Name: {profile.get('name')}")
+            context_lines.append(f"Farmer excess resources: {profile.get('excess_resources')}")
+            context_lines.append(f"Farmer required resources: {profile.get('required_resources')}")
+        context_lines.append("Top matches are calculated using the Haversine distance formula to match nearest providers/consumers with cooperative mutual barters highlighted.")
+    elif page == "map":
+        context_lines.append("Interactive Geographic India Map. Displays active farmers across different Indian states.")
+        context_lines.append("Pins are plotted by coordinates (Latitude & Longitude). Clicking details displays crop selections, excess resources, and required resources, facilitating smart regional pooling.")
     else:
         context_lines.append("General farm state overview.")
 
