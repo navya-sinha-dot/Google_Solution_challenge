@@ -338,6 +338,23 @@ class TestVoice:
         )
         _warn(r, "POST /api/profile/voice-update")
 
+    def test_voice_process(self):
+        audio_content = b"RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00\x11\x2b\x00\x00\x11\x2b\x00\x00\x01\x00\x08\x00data\x00\x00\x00\x00"
+        files = {
+            "audio": ("test.webm", audio_content, "audio/webm")
+        }
+        data = {
+            "language_code": "hi-IN",
+            "model": "saaras:v3"
+        }
+        r = client.post(
+            "/api/voice/process",
+            files=files,
+            data=data
+        )
+        _ok(r, "POST /api/voice/process")
+
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 9. Webhooks

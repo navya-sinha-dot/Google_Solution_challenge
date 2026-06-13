@@ -38,12 +38,15 @@ export default function Signup() {
     const [isLoading, setIsLoading] = useState(false);
 
     const { login, sendOtp } = useAuth();
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const navigate = useNavigate();
 
     const handleDataExtracted = (data: any) => {
         if (data.name) setName(data.name);
-        if (data.phone) setPhone(data.phone);
+        if (data.phone) {
+            const cleanPhone = data.phone.toString().replace(/[- \(\)]/g, '').replace(/^\+?91/, '');
+            setPhone(cleanPhone);
+        }
         if (data.land_size_acres) setLandSize(data.land_size_acres.toString());
         if (data.location) setLocation(data.location);
         if (data.crops) {
@@ -174,6 +177,7 @@ export default function Signup() {
                                 description="Tap the microphone and speak your name, phone number, land size in acres, location, and crops grown."
                                 endpoint="/api/voice/process"
                                 onDataExtracted={handleDataExtracted}
+                                lang={language === 'en' ? 'en-IN' : `${language}-IN`}
                             />
                             
                             <AnimatePresence>

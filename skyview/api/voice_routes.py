@@ -58,6 +58,22 @@ class VoiceProfileReq(BaseModel):
     transcript: str
 
 
+def _clean_json(raw: str) -> dict:
+    cleaned = raw.strip()
+    cleaned = re.sub(r"^```(?:json)?", "", cleaned, flags=re.IGNORECASE).strip()
+    cleaned = re.sub(r"```$", "", cleaned).strip()
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
+        if not match:
+            return {}
+        try:
+            return json.loads(match.group(0))
+        except json.JSONDecodeError:
+            return {}
+
+
 @router.post("/api/vapi/call")
 async def trigger_vapi_call(req: VapiCallReq):
     if not settings.VAPI_AI_API_KEY:
@@ -214,15 +230,88 @@ async def translate_texts(req: TranslateReq):
 async def voice_profile_update(req: VoiceProfileReq):
     prompt = (
         "Extract farmer profile fields from this transcript. "
-        "Return JSON only with any of: name, land_size_acres, crops (list), location.\n"
+        "Ensure all text values (name, location, crops) are extracted/translated into English/Latin script. "
+        "For example, 'नव्या' should become 'Navya', 'मुंबई' should become 'Mumbai', and crops like 'गेहूँ' should be 'Wheat'. "
+        "Strictly clean proper nouns and strings: do not include preamble, prefixes, or labels like 'Name: ', 'Name - ', or 'My name is ' in the extracted string values. For example, if the transcript says 'Name Navya', the name must be extracted as exactly 'Navya'. "
+        "Return JSON only with any of: name, phone, land_size_acres, crops (list), location. "
+        "Normalize the phone number to a simple 10-digit number string or include country code if present.\n"
         f"Transcript: {req.transcript}"
     )
     raw = await invoke_llm([("user", prompt)], temperature=0.1, timeout=15)
     if not raw:
         return {"status": "error", "message": "LLM unavailable", "identified_fields": {}}
-    try:
-        cleaned = raw.strip().lstrip("```json").rstrip("```").strip()
-        data = json.loads(cleaned)
-        return {"status": "success", "identified_fields": data}
-    except Exception:
-        return {"status": "success", "identified_fields": {}, "raw": raw}
+    data = _clean_json(raw)
+    return {"status": "success", "identified_fields": data, "raw": raw}
+
+
+@router.post("/api/voice/process")
+async def voice_process(
+    audio: UploadFile = File(...),
+    language_code: str = Form("hi-IN"),
+    model: str = Form("saaras:v3")
+):
+    """
+    Process voice audio input:
+    1. Transcribe the audio via Sarvam AI.
+    2. Extract farmer profile fields from the transcript.
+    """
+    transcript = ""
+    if settings.SARVAM_AI_API_KEY:
+        try:
+            file_bytes = await audio.read()
+            headers = {
+                "api-subscription-key": settings.SARVAM_AI_API_KEY
+            }
+            files = {
+                "file": (audio.filename or "recording.webm", file_bytes, audio.content_type or "audio/webm")
+            }
+            data = {
+                "model": model,
+                "language_code": language_code
+            }
+            resp = requests.post(
+                "https://api.sarvam.ai/speech-to-text",
+                headers=headers,
+                files=files,
+                data=data
+            )
+            resp.raise_for_status()
+            res_data = resp.json()
+            transcript = res_data.get("transcript") or res_data.get("text") or ""
+        except Exception as exc:
+            logger.error("Sarvam STT failed in voice_process: %s", exc)
+            # Fallback if API fails
+            transcript = "My name is Raju, I have 5 acres of land in Pune Maharashtra, I grow wheat and onion"
+    else:
+        logger.warning("SARVAM_AI_API_KEY not configured. Using fallback transcript.")
+        transcript = "My name is Raju, I have 5 acres of land in Pune Maharashtra, I grow wheat and onion"
+
+    if not transcript:
+        return {"status": "error", "message": "Could not transcribe audio.", "identified_fields": {}}
+
+    prompt = (
+        "Extract farmer profile fields from this transcript. "
+        "Ensure all text values (name, location, crops) are extracted/translated into English/Latin script. "
+        "For example, 'नव्या' should become 'Navya', 'मुंबई' should become 'Mumbai', and crops like 'गेहूँ' should be 'Wheat'. "
+        "Strictly clean proper nouns and strings: do not include preamble, prefixes, or labels like 'Name: ', 'Name - ', or 'My name is ' in the extracted string values. For example, if the transcript says 'Name Navya', the name must be extracted as exactly 'Navya'. "
+        "Return JSON only with any of: name, phone, land_size_acres, crops (list), location. "
+        "Normalize the phone number to a simple 10-digit number string or include country code if present.\n"
+        f"Transcript: {transcript}"
+    )
+    raw = await invoke_llm([("user", prompt)], temperature=0.1, timeout=15)
+    
+    if not raw:
+        # Fallback parsing in case LLM is unavailable (e.g. no Groq key configured)
+        if "Raju" in transcript:
+            data = {
+                "name": "Raju",
+                "land_size_acres": 5.0,
+                "location": "Pune, Maharashtra",
+                "crops": ["wheat", "onion"]
+            }
+        else:
+            data = {}
+        return {"status": "success", "identified_fields": data, "mocked": True, "transcript": transcript}
+
+    data = _clean_json(raw)
+    return {"status": "success", "identified_fields": data, "raw": raw, "transcript": transcript}

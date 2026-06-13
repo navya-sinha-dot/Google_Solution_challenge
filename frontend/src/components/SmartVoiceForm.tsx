@@ -64,6 +64,7 @@ export function SmartVoiceForm({ title, description, endpoint, onDataExtracted, 
     try {
       const formData = new FormData();
       formData.append("audio", new File([audioBlob], "recording.webm", { type: "audio/webm" }));
+      formData.append("language_code", lang);
       
       const response = await fetch(`${API_URL}/api/voice/process`, {
         method: "POST",
