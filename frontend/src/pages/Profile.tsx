@@ -574,7 +574,15 @@ export default function Profile() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16, position: 'sticky', top: 20 }}>
 
             {/* Profile card */}
-            <div style={{ ...css.card(isDark), padding: '20px' }}>
+            <div
+              className="scrollable-card"
+              style={{
+                ...css.card(isDark),
+                padding: '20px',
+                maxHeight: 'calc(100vh - 120px)',
+                overflowY: 'auto',
+              }}
+            >
               {/* Header */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, paddingBottom: 14, borderBottom: `1px solid ${borderColor}` }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -742,7 +750,7 @@ export default function Profile() {
                 </button>
               </div>
             </div>
-
+            
             {/* Scheme cards list */}
             {schemesLoading && schemes.length === 0 ? (
               <div style={{
@@ -783,6 +791,20 @@ export default function Profile() {
         @keyframes profile-pulse {
           0%, 100% { opacity: 1; }
           50%       { opacity: 0.3; }
+        }
+        /* Custom scrollbar for scrollable cards */
+        .scrollable-card::-webkit-scrollbar {
+          width: 6px;
+        }
+        .scrollable-card::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .scrollable-card::-webkit-scrollbar-thumb {
+          background: ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.15)'};
+          border-radius: 3px;
+        }
+        .scrollable-card::-webkit-scrollbar-thumb:hover {
+          background: #2ECC71;
         }
       `}</style>
     </div>

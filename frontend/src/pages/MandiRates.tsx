@@ -179,6 +179,7 @@ export default function MandiRates() {
   const [sortField, setSortField] = useState<'modal_price' | 'commodity'>('commodity');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [hoveredPoint, setHoveredPoint] = useState<any>(null);
+  const [timeframe, setTimeframe] = useState<'1M' | '3M' | 'all'>('3M');
 
   // ── Queries ──────────────────────────────────────────────────────────────────
 
@@ -329,6 +330,7 @@ export default function MandiRates() {
         max: Number(r.max_price),
         modal: Number(r.modal_price),
         date: r.arrival_date,
+        range: [Number(r.min_price), Number(r.max_price)],
       }))
       .reverse();
     return data.map((d, index) => {
@@ -339,10 +341,20 @@ export default function MandiRates() {
     });
   }, [historyData]);
 
+  const displayedChartData = useMemo(() => {
+    if (timeframe === '1M') {
+      return chartDataWithMA.slice(-30);
+    }
+    if (timeframe === '3M') {
+      return chartDataWithMA.slice(-90);
+    }
+    return chartDataWithMA;
+  }, [chartDataWithMA, timeframe]);
+
   useEffect(() => {
-    if (chartDataWithMA.length > 0) setHoveredPoint(chartDataWithMA[chartDataWithMA.length - 1]);
+    if (displayedChartData.length > 0) setHoveredPoint(displayedChartData[displayedChartData.length - 1]);
     else setHoveredPoint(null);
-  }, [chartDataWithMA]);
+  }, [displayedChartData]);
 
   // ── Theme tokens ──────────────────────────────────────────────────────────────
   const textPrimary = css.text.primary(isDark);
@@ -511,7 +523,7 @@ export default function MandiRates() {
             }}>
               <div style={{
                 display: 'flex',
-                animation: 'mandi-marquee 32s linear infinite',
+                animation: 'mandi-marquee 75s linear infinite',
                 whiteSpace: 'nowrap',
                 width: 'max-content',
               }}>
@@ -564,14 +576,41 @@ export default function MandiRates() {
                       {selectedCommodity || 'Wheat'} Price Trends
                     </h2>
                     <p style={{ fontSize: 12, color: textSecondary, margin: '3px 0 0' }}>
-                      {chartDataWithMA.length} data points · Live database history
+                      {displayedChartData.length} data points · Live database history
                     </p>
                   </div>
-                  <Badge
-                    label={isCacheHit ? '● CACHED · HIT' : '● LIVE · MISS'}
-                    color={isCacheHit ? '#2ECC71' : '#F59E0B'}
-                    bg={isCacheHit ? 'rgba(46,204,113,0.1)' : 'rgba(245,158,11,0.1)'}
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    {/* Timeframe Selector */}
+                    <div style={{ display: 'flex', gap: 4, background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)', padding: 4, borderRadius: 10 }}>
+                      {(['1M', '3M', 'all'] as const).map(tf => {
+                        const isActive = timeframe === tf;
+                        return (
+                          <button
+                            key={tf}
+                            onClick={() => setTimeframe(tf)}
+                            style={{
+                              padding: '4px 12px',
+                              borderRadius: 8,
+                              border: 'none',
+                              background: isActive ? '#2ECC71' : 'transparent',
+                              color: isActive ? '#fff' : textSecondary,
+                              fontWeight: 700,
+                              fontSize: 11,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s',
+                            }}
+                          >
+                            {tf === 'all' ? 'All' : tf}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <Badge
+                      label={isCacheHit ? '● CACHED · HIT' : '● LIVE · MISS'}
+                      color={isCacheHit ? '#2ECC71' : '#F59E0B'}
+                      bg={isCacheHit ? 'rgba(46,204,113,0.1)' : 'rgba(245,158,11,0.1)'}
+                    />
+                  </div>
                 </div>
 
                 {/* Chart body */}
@@ -581,7 +620,7 @@ export default function MandiRates() {
                       <Loader2 size={32} color="#2ECC71" style={{ animation: 'mandi-spin 1s linear infinite' }} />
                       <span style={{ fontSize: 13, color: textSecondary }}>Loading chart data…</span>
                     </div>
-                  ) : chartDataWithMA.length === 0 ? (
+                  ) : displayedChartData.length === 0 ? (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
                       <p style={{ color: textSecondary, textAlign: 'center', fontSize: 14 }}>
                         No price history found.<br />Try a different state or commodity.
@@ -614,7 +653,7 @@ export default function MandiRates() {
                     </div>
                     <ResponsiveContainer width="100%" height="100%">
                       <ComposedChart
-                        data={chartDataWithMA}
+                        data={displayedChartData}
                         onMouseMove={state => {
                           if (state?.activePayload?.length) setHoveredPoint(state.activePayload[0].payload);
                         }}
@@ -658,28 +697,12 @@ export default function MandiRates() {
                             );
                           }}
                         />
-                        {/* Band: min area (white/transparent base) stacked under max */}
+                        {/* Ranged Area Band */}
                         <Area
                           type="monotone"
-                          dataKey="max"
-                          stroke="#2ECC71"
-                          strokeWidth={1}
-                          strokeOpacity={0.4}
+                          dataKey="range"
+                          stroke="none"
                           fill="url(#cmBandFill)"
-                          fillOpacity={1}
-                          legendType="none"
-                          dot={false}
-                          activeDot={false}
-                          isAnimationActive={false}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="min"
-                          stroke="#2ECC71"
-                          strokeWidth={1}
-                          strokeOpacity={0.3}
-                          fill={isDark ? '#0d1f10' : '#FFFFFF'}
-                          fillOpacity={1}
                           legendType="none"
                           dot={false}
                           activeDot={false}
@@ -690,7 +713,7 @@ export default function MandiRates() {
                           type="monotone"
                           dataKey="modal"
                           stroke="#2ECC71"
-                          strokeWidth={2.5}
+                          strokeWidth={2}
                           dot={false}
                           activeDot={{ r: 5, fill: '#2ECC71', stroke: isDark ? '#0d1f10' : '#fff', strokeWidth: 2 }}
                           isAnimationActive={false}
@@ -699,7 +722,7 @@ export default function MandiRates() {
                           type="monotone"
                           dataKey="ma"
                           stroke="#3B82F6"
-                          strokeWidth={2}
+                          strokeWidth={1.5}
                           strokeDasharray="5 4"
                           dot={false}
                           activeDot={false}

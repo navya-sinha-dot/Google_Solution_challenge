@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { useTheme } from 'next-themes';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -15,6 +16,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const { setTheme } = useTheme();
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return localStorage.getItem('weather_auth') === 'true';
   });
@@ -67,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsAuthenticated(true);
         localStorage.setItem('weather_auth', 'true');
         localStorage.setItem('user_phone', phone);
+        setTheme('light');
         return true;
       }
       return false;
@@ -74,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Error verifying OTP:', error);
       return false;
     }
-  }, []);
+  }, [setTheme]);
 
   const logout = useCallback(async () => {
     setIsAuthenticated(false);
