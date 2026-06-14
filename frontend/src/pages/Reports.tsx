@@ -229,9 +229,9 @@ export default function Reports() {
       }
 
       await addStep("🧠 Synthesizing data prompts and formatting criteria...", 80);
-      await addStep("Calling Kisan Mitra AI model (Groq pool: category overview)...", 90);
+      await addStep("Calling Kisan Mitra AI model (Gemini pool: category overview)...", 90);
 
-      // Groq AI call
+      // Gemini AI call
       const r = await fetch(`${API_BASE}/api/advisor/insights`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -833,7 +833,7 @@ p,span,div,strong{color:#222!important}
                     </div>
                     <div>
                       <p style={{ fontSize: 10, fontWeight: 800, color: '#7C3AED', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6, textAlign: "left" }}>
-                        Powered by Llama3 / Groq AI
+                        Powered by Llama3 / Gemini AI
                       </p>
                       <FormattedMessage text={preprocessText(aiAdvice)} />
                     </div>

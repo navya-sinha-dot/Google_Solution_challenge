@@ -422,7 +422,7 @@ export default function Advisor() {
     return () => clearInterval(timer);
   }, [sensorUpdatedAt]);
 
-  // Fetch AI Sowing insights (Groq Call)
+  // Fetch AI Sowing insights (Gemini Call)
   const {
     data: overview = null,
     isFetching: isLoadingInsights,

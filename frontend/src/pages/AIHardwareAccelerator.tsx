@@ -49,7 +49,7 @@ const NODES: NodeDef[] = [
   { id: "fusion",   label: "Sensor Fusion",    sub: "Kalman filter · HLS",    tooltip: "AXI4-Lite Kalman filter core fuses soil, temperature, humidity, and light into a single plant-health score (0–100) and a stress index (%). Removes sensor noise and weights channels by crop-type coefficients.",         x: 536, y: 118, col: "model"  },
   { id: "rain",     label: "Rain Predictor",   sub: "Random forest · HLS",    tooltip: "Random forest model trained on 5 years of Indian monsoon data. Takes temp, humidity, pressure, and wind; outputs rain probability (%) and a 3-hour forecast horizon. Runs as an HLS core on the FPGA.",                   x: 536, y: 226, col: "model"  },
   { id: "irrig",    label: "Irrigation AI",    sub: "Multi-factor · HLS",     tooltip: "Combines the fusion score, rain probability, and crop growth stage to compute an optimal irrigation schedule: next irrigation time, duration, and volume in litres/m².",                   x: 536, y: 334, col: "model"  },
-  { id: "groq",     label: "Groq LLM",         sub: "llama-3.1-8b-instant",   tooltip: "Groq cloud inference (llama-3.1-8b-instant). Receives the numeric FPGA outputs and translates them into plain-language field recommendations, alerts, and reasoning a farmer can act on immediately.", x: 788, y: 196, col: "llm"    },
+  { id: "gemini",     label: "Gemini LLM",         sub: "Gemini 3.5 Flash",   tooltip: "Gemini cloud inference (Gemini 3.5 Flash). Receives the numeric FPGA outputs and translates them into plain-language field recommendations, alerts, and reasoning a farmer can act on immediately.", x: 788, y: 196, col: "llm"    },
 ];
 
 interface EdgeDef { from: string; to: string; phaseShift: number; }
@@ -62,9 +62,9 @@ const EDGES: EdgeDef[] = [
   { from: "fpga",     to: "fusion", phaseShift: 0.10 },
   { from: "fpga",     to: "rain",   phaseShift: 0.45 },
   { from: "fpga",     to: "irrig",  phaseShift: 0.75 },
-  { from: "fusion",   to: "groq",   phaseShift: 0.05 },
-  { from: "rain",     to: "groq",   phaseShift: 0.35 },
-  { from: "irrig",    to: "groq",   phaseShift: 0.65 },
+  { from: "fusion",   to: "gemini",   phaseShift: 0.05 },
+  { from: "rain",     to: "gemini",   phaseShift: 0.35 },
+  { from: "irrig",    to: "gemini",   phaseShift: 0.65 },
 ];
 
 function nodeById(id: string) { return NODES.find(n => n.id === id)!; }
@@ -423,7 +423,7 @@ function LLMBlock({ text, isDark }: { text: string; isDark: boolean }) {
   return (
     <div style={{ marginTop: "0.9rem" }}>
       <button onClick={() => setOpen(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: "0.72rem", fontWeight: 600, color: isDark ? "#888" : "#666", display: "flex", alignItems: "center", gap: "0.4rem", letterSpacing: "0.04em", textTransform: "uppercase" }}>
-        Groq LLM analysis {open ? "▲" : "▼"}
+        Gemini LLM analysis {open ? "▲" : "▼"}
       </button>
       {open && (
         <div style={{ marginTop: "0.75rem", padding: "0.9rem 1.1rem", borderRadius: 8, background: isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.025)", borderLeft: `2px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)"}` }}>
@@ -542,7 +542,7 @@ export default function AIHardwareAccelerator() {
 
   const predictRain = async () => {
     setLoadingRain(true);
-    setActivePipeline(["temp","pressure","wind","fpga","rain","groq"]);
+    setActivePipeline(["temp","pressure","wind","fpga","rain","gemini"]);
     try {
       const r = await fetch(`${API_URL}/api/fpga/rain-predict`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ temperature: sensor.temperature, humidity: sensor.humidity, pressure: sensor.pressure, wind_speed: sensor.wind_speed }) });
       if (r.ok) { const d = await r.json(); setRainResult(d); if (d.hardware_mode) setHwMode(d.hardware_mode); toast({ title: "Rain prediction complete" }); }
@@ -553,7 +553,7 @@ export default function AIHardwareAccelerator() {
 
   const runFusion = async () => {
     setLoadingFusion(true);
-    setActivePipeline(["temp","soil","light","fpga","fusion","groq"]);
+    setActivePipeline(["temp","soil","light","fpga","fusion","gemini"]);
     try {
       const r = await fetch(`${API_URL}/api/fpga/fusion`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ soil_moisture: sensor.soil_moisture, temperature: sensor.temperature, humidity: sensor.humidity, light_level: sensor.light_level }) });
       if (r.ok) { const d = await r.json(); setFusionResult(d); if (d.hardware_mode) setHwMode(d.hardware_mode); toast({ title: "Sensor fusion complete" }); }
@@ -564,7 +564,7 @@ export default function AIHardwareAccelerator() {
 
   const runCombined = async () => {
     setLoadingCombined(true);
-    setActivePipeline(["temp","pressure","soil","light","wind","fpga","fusion","rain","irrig","groq"]);
+    setActivePipeline(["temp","pressure","soil","light","wind","fpga","fusion","rain","irrig","gemini"]);
     try {
       const r = await fetch(`${API_URL}/api/fpga/combined-analysis`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ soil_moisture: sensor.soil_moisture, temperature: sensor.temperature, humidity: sensor.humidity, light_level: sensor.light_level }) });
       if (r.ok) { const d = await r.json(); setCombinedResult(d); if (d.hardware_mode) setHwMode(d.hardware_mode); toast({ title: "Irrigation analysis complete" }); }
@@ -663,10 +663,10 @@ export default function AIHardwareAccelerator() {
             <p style={{ margin: "0 0 0.35rem", fontSize: "0.72rem", fontWeight: 700, color: isDark ? "#555" : "#BBB", textTransform: "uppercase", letterSpacing: "0.08em" }}>Pipeline 3</p>
             <h3 style={{ margin: "0 0 0.5rem", fontSize: "1rem", fontWeight: 700, color: isDark ? "#E8E8E8" : "#111" }}>Full Irrigation Analysis</h3>
             <p style={{ margin: "0 0 0.85rem", fontSize: "0.78rem", color: isDark ? "#888" : "#666", lineHeight: 1.55 }}>
-              Runs all three FPGA pipelines — fusion, rain prediction, and irrigation scheduling — in sequence. Groq LLM synthesises results into a concrete field action plan.
+              Runs all three FPGA pipelines — fusion, rain prediction, and irrigation scheduling — in sequence. Gemini LLM synthesises results into a concrete field action plan.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem", marginBottom: "1rem" }}>
-              {["All sensors","All models","Groq LLM"].map(s => (
+              {["All sensors","All models","Gemini LLM"].map(s => (
                 <span key={s} style={{ fontSize: "0.65rem", padding: "0.15rem 0.5rem", borderRadius: 9999, background: isDark ? "rgba(46,204,113,0.08)" : "rgba(46,204,113,0.07)", color: "#2ECC71", border: "1px solid rgba(46,204,113,0.2)" }}>{s}</span>
               ))}
             </div>
@@ -693,7 +693,7 @@ export default function AIHardwareAccelerator() {
               `ESP32 readings collected — Temp: ${sensor.temperature}°C, Humidity: ${sensor.humidity}%, Pressure: ${sensor.pressure} hPa, Wind: ${sensor.wind_speed} km/h.`,
               "Values sent via AXI4-Lite to the HLS random-forest core. Model trained on 5 years of Indian monsoon data with 42 decision trees.",
               "Rain probability computed from the ensemble vote. Confidence = fraction of trees in agreement.",
-              "Groq LLM (llama-3.1-8b) receives the numeric output and generates plain-language field advice.",
+              "Gemini LLM (Gemini 3.5 Flash) receives the numeric output and generates plain-language field advice.",
             ]} />
             {rainResult.ai_insights && <LLMBlock text={rainResult.ai_insights} isDark={isDark} />}
           </ResultCard>
@@ -750,7 +750,7 @@ export default function AIHardwareAccelerator() {
               "All five sensor channels (12 data points) sent to FPGA in a single AXI burst transaction.",
               "Three HLS accelerator cores run: Kalman fusion, rain forest classifier, and irrigation scheduler.",
               "Results merged into a risk matrix — soil deficit × rain probability × crop growth stage.",
-              "Groq LLM receives the full matrix and outputs a time-specific irrigation plan.",
+              "Gemini LLM receives the full matrix and outputs a time-specific irrigation plan.",
             ]} />
             {combinedResult.ai_enhancement && <LLMBlock text={combinedResult.ai_enhancement} isDark={isDark} />}
           </ResultCard>
