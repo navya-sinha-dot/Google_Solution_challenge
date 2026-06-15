@@ -270,7 +270,7 @@ export default function BuyHardware() {
                     }}
                   >
                     <ShoppingCart style={{ width: "18px", height: "18px" }} />
-                    Order Now — ₹35,999
+                    Order Now — ₹21,000
                   </button>
                 ) : (
                   <div
