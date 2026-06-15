@@ -270,7 +270,7 @@ export default function BuyHardware() {
                     }}
                   >
                     <ShoppingCart style={{ width: "18px", height: "18px" }} />
-                    Order Now — ₹12,999
+                    Order Now — ₹35,999
                   </button>
                 ) : (
                   <div
@@ -319,131 +319,42 @@ export default function BuyHardware() {
               </div>
             </div>
 
-            {/* Right: visual device card */}
+            {/* Right: hardware physical image */}
             <div style={{ display: "flex", justifyContent: "center" }}>
               <div
                 style={{
-                  width: "280px",
-                  height: "320px",
+                  width: "100%",
+                  maxWidth: "360px",
                   borderRadius: "24px",
                   background: isDark
-                    ? "linear-gradient(145deg, rgba(46,204,113,0.12), rgba(33,150,243,0.08))"
-                    : "linear-gradient(145deg, rgba(46,204,113,0.08), rgba(33,150,243,0.05))",
+                    ? "rgba(255, 255, 255, 0.02)"
+                    : "rgba(255, 255, 255, 0.8)",
                   border: isDark
-                    ? "1px solid rgba(46,204,113,0.2)"
-                    : "1px solid rgba(46,204,113,0.15)",
+                    ? "1px solid rgba(46, 204, 113, 0.15)"
+                    : "1px solid rgba(200, 230, 200, 0.5)",
+                  boxShadow: isDark
+                    ? "0 20px 48px rgba(0, 0, 0, 0.4)"
+                    : "0 20px 48px rgba(0, 0, 0, 0.06)",
+                  padding: "16px",
                   display: "flex",
-                  flexDirection: "column",
                   alignItems: "center",
                   justifyContent: "center",
-                  gap: "16px",
-                  boxShadow: "0 20px 60px rgba(0,0,0,0.1)",
-                  position: "relative",
                   overflow: "hidden",
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
                 }}
               >
-                {/* Glow */}
-                <div
+                <img
+                  src="/hardware_station.png"
+                  alt="AgriSense WS01 Physical Weather Station"
                   style={{
-                    position: "absolute",
-                    top: "30%",
-                    left: "50%",
-                    transform: "translate(-50%, -50%)",
-                    width: "140px",
-                    height: "140px",
-                    borderRadius: "50%",
-                    background:
-                      "radial-gradient(circle, rgba(46,204,113,0.15), transparent 70%)",
+                    width: "100%",
+                    height: "auto",
+                    borderRadius: "16px",
+                    objectFit: "contain",
+                    maxHeight: "340px",
                   }}
                 />
-
-                <div
-                  style={{
-                    width: "80px",
-                    height: "80px",
-                    borderRadius: "22px",
-                    background: "linear-gradient(135deg, #2ECC71, #1a9e52)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    boxShadow: "0 8px 24px rgba(46,204,113,0.4)",
-                  }}
-                >
-                  <Cpu
-                    style={{ width: "40px", height: "40px", color: "white" }}
-                  />
-                </div>
-
-                <div style={{ textAlign: "center" }}>
-                  <p
-                    style={{
-                      fontSize: "18px",
-                      fontWeight: 900,
-                      color: textPrimary,
-                      margin: 0,
-                    }}
-                  >
-                    AgriSense WS01
-                  </p>
-                  <p
-                    style={{
-                      fontSize: "12px",
-                      color: "#2ECC71",
-                      fontWeight: 700,
-                      margin: "4px 0 0",
-                    }}
-                  >
-                    FPGA Weather Station
-                  </p>
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "8px",
-                    flexWrap: "wrap",
-                    justifyContent: "center",
-                    padding: "0 16px",
-                  }}
-                >
-                  {["MQTT", "IoT", "FPGA", "AI"].map((t) => (
-                    <span
-                      key={t}
-                      style={{
-                        fontSize: "10px",
-                        fontWeight: 800,
-                        padding: "3px 9px",
-                        borderRadius: "20px",
-                        background: "rgba(46,204,113,0.12)",
-                        color: "#2ECC71",
-                        border: "1px solid rgba(46,204,113,0.2)",
-                      }}
-                    >
-                      {t}
-                    </span>
-                  ))}
-                </div>
-
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: "6px" }}
-                >
-                  <Shield
-                    style={{
-                      width: "13px",
-                      height: "13px",
-                      color: textSecondary,
-                    }}
-                  />
-                  <span
-                    style={{
-                      fontSize: "11px",
-                      color: textSecondary,
-                      fontWeight: 600,
-                    }}
-                  >
-                    1-Year Warranty
-                  </span>
-                </div>
               </div>
             </div>
           </div>
