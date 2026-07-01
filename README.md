@@ -1,6 +1,6 @@
 # 🌾 SkyView — Smart Agriculture Platform
 
-An end-to-end intelligent agriculture system for Indian farmers, combining real-time IoT sensing, multi-agent AI, FPGA hardware acceleration, and a multilingual React dashboard with voice interaction.
+An end-to-end intelligent agriculture system for Indian farmers, combining real-time IoT sensing, multi-agent AI, FPGA hardware acceleration, a multilingual React dashboard, and a native Flutter mobile application with voice-first field controls.
 
 Built for **Google Solution Challenge**.
 
@@ -11,6 +11,7 @@ Built for **Google Solution Challenge**.
 - **Live weather station** — ESP32 sensors (temperature, humidity, soil moisture, UV, PM2.5) transmit via LoRa to a Raspberry Pi gateway, ingested into PostgreSQL in real time
 - **AI farm advisor** — multi-agent system powered by Groq (Llama 3.1) gives crop recommendations, irrigation schedules, pest alerts, and soil analysis based on live sensor data
 - **Mandi rates** — live commodity prices from data.gov.in with 30-minute caching, MSP history, and buyer matching
+- **Multilingual Mobile App** — a cross-platform Flutter application providing field-ready telemetry charts, mandi price lookups, AI advisors, scheme recommendations, and hands-free voice control
 - **Voice interaction** — farmers can call in via Vapi.ai or WhatsApp (Twilio) and get AI responses in Hindi/regional languages via Sarvam AI TTS
 - **FPGA acceleration** — Xilinx ZC706 board runs HLS-synthesized sensor fusion and rain prediction; falls back to software simulation when hardware isn't connected
 - **Government schemes** — AI-curated scheme recommendations based on farmer profile (land size, location, crops)
@@ -92,6 +93,9 @@ Frontend: http://localhost:5173
 │       ├── config.py           # All env vars (Settings class)
 │       ├── llm_pool.py         # Round-robin Groq key balancer
 │       └── logger.py           # Structured logging
+│
+├── skyview_flutter_app/        # Flutter Mobile Application
+│   └── skyview_flutter/        # Flutter source, assets, translations
 │
 ├── src/                        # React frontend
 │   ├── pages/                  # Route-level page components
@@ -291,7 +295,7 @@ _register("skyview.api.my_feature_routes")
 | FPGA | Xilinx ZC706, Vivado HLS, Verilog RTL, AXI4-Lite |
 | Voice | Vapi.ai (calls), Sarvam AI (TTS + translation), Twilio (WhatsApp) |
 | Frontend | React 18, Vite, TypeScript, Tailwind CSS, Recharts |
-| Mobile App | Flutter, Riverpod, SQLite (PowerSync offline sync), on-device Gemma LLM |
+| Mobile App | Flutter, Riverpod, Multilingual Chat, Telemetry charts, Voice-first controls |
 | Infrastructure | Docker, docker-compose, nginx, uvicorn |
 | Testing | pytest, FastAPI TestClient, httpx |
 
@@ -299,12 +303,12 @@ _register("skyview.api.my_feature_routes")
 
 ## 📱 Mobile Application
 
-A cross-platform Flutter application tailored for farmers with full offline-first capabilities:
-* **SQLite Offline Synchronization**: Syncs profiles, mandi rates, and message outboxes locally using PowerSync.
-* **On-Device LLM (Gemma 2B)**: Leverages a local quantized Gemma model on the GPU for offline conversational intelligence.
-* **Offline RAG Integration**: Auto-embeds cached farm and market context into local prompts.
+A cross-platform Flutter application tailored for farmers, serving as a multilingual, voice-interactive client for the SkyView platform:
+* **Multilingual Crop Advisory**: Field-ready access to specialized AI advisors.
+* **Telemetry Dashboards**: Visualizes real-time ESP32 weather station readings directly on the phone.
+* **Mandi Rate Tracker**: Easy mobile access to data.gov.in commodity rates and MSP history.
 
-For setup, architecture, and developer best practices, refer to the [Mobile App Developer Guide](file:///c:/Users/vinay/OneDrive/Desktop/troubleshooters/Google_Solution_challenge/skyview_flutter_app/skyview_flutter/APP_DEVELOPMENT.md).
+For setup, architecture, and developer best practices, refer to the [Mobile App Developer Guide](file:///c:/Users/vinay/OneDrive/Desktop/troubleshooters/Google_Solution_challenge/APP_DEVELOPMENT.md).
 
 ---
 
