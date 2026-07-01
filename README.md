@@ -291,8 +291,20 @@ _register("skyview.api.my_feature_routes")
 | FPGA | Xilinx ZC706, Vivado HLS, Verilog RTL, AXI4-Lite |
 | Voice | Vapi.ai (calls), Sarvam AI (TTS + translation), Twilio (WhatsApp) |
 | Frontend | React 18, Vite, TypeScript, Tailwind CSS, Recharts |
+| Mobile App | Flutter, Riverpod, SQLite (PowerSync offline sync), on-device Gemma LLM |
 | Infrastructure | Docker, docker-compose, nginx, uvicorn |
 | Testing | pytest, FastAPI TestClient, httpx |
+
+---
+
+## 📱 Mobile Application
+
+A cross-platform Flutter application tailored for farmers with full offline-first capabilities:
+* **SQLite Offline Synchronization**: Syncs profiles, mandi rates, and message outboxes locally using PowerSync.
+* **On-Device LLM (Gemma 2B)**: Leverages a local quantized Gemma model on the GPU for offline conversational intelligence.
+* **Offline RAG Integration**: Auto-embeds cached farm and market context into local prompts.
+
+For setup, architecture, and developer best practices, refer to the [Mobile App Developer Guide](file:///c:/Users/vinay/OneDrive/Desktop/troubleshooters/Google_Solution_challenge/skyview_flutter_app/skyview_flutter/APP_DEVELOPMENT.md).
 
 ---
 
