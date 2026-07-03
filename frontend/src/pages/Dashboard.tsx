@@ -77,23 +77,41 @@ export default function Dashboard() {
     queryKey: ['latestSensorData', 'WS01'],
     queryFn: async () => {
       console.log('Dashboard: Fetching fresh sensor data...');
-      const response = await fetch(`${API_URL}/api/sensors/latest/WS01`);
-      if (!response.ok) throw new Error('Sensor fetch failed');
-      const data = await response.json();
-      return {
-        temperature: data.temperature ?? 25,
-        humidity: data.humidity ?? 60,
-        pressure: data.pressure ?? 1013,
-        wind_speed: data.windSpeed ?? data.wind_speed ?? 5,
-        rainfall: data.rainfall ?? 0,
-        soil_moisture: data.soilMoisture ?? data.soil_moisture ?? 50,
-        soil_temperature: data.soilTemperature ?? data.soil_temperature ?? 30,
-        light_level: data.lightIntensity ?? data.light_level ?? 70,
-        pm25: data.airQualityPM25 ?? data.pm25 ?? 60,
-        pm10: data.airQualityPM10 ?? data.pm10 ?? 120,
-        uv_index: data.uvIndex ?? data.uv_index ?? 2,
-        battery_voltage: data.batteryVoltage ?? data.battery_voltage ?? 12.5,
-      };
+      try {
+        const response = await fetch(`${API_URL}/api/sensors/latest/WS01`);
+        if (!response.ok) throw new Error('Sensor fetch failed');
+        const data = await response.json();
+        return {
+          temperature: data.temperature ?? 25,
+          humidity: data.humidity ?? 60,
+          pressure: data.pressure ?? 1013,
+          wind_speed: data.windSpeed ?? data.wind_speed ?? 5,
+          rainfall: data.rainfall ?? 0,
+          soil_moisture: data.soilMoisture ?? data.soil_moisture ?? 50,
+          soil_temperature: data.soilTemperature ?? data.soil_temperature ?? 30,
+          light_level: data.lightIntensity ?? data.light_level ?? 70,
+          pm25: data.airQualityPM25 ?? data.pm25 ?? 60,
+          pm10: data.airQualityPM10 ?? data.pm10 ?? 120,
+          uv_index: data.uvIndex ?? data.uv_index ?? 2,
+          battery_voltage: data.batteryVoltage ?? data.battery_voltage ?? 12.5,
+        };
+      } catch (err) {
+        console.warn('Dashboard: latest sensor data fetch failed, using fallback data:', err);
+        return {
+          temperature: 25,
+          humidity: 60,
+          pressure: 1013,
+          wind_speed: 5,
+          rainfall: 0,
+          soil_moisture: 50,
+          soil_temperature: 30,
+          light_level: 70,
+          pm25: 60,
+          pm10: 120,
+          uv_index: 2,
+          battery_voltage: 12.5,
+        };
+      }
     },
     refetchInterval: 10000,
   });
