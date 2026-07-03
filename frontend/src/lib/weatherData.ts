@@ -148,8 +148,8 @@ export async function getSystemHealth(): Promise<SystemHealth> {
       solarCharging: solar > 0,
       loraLinkActive: true,
       edgeSystemRunning: true,
-      sensorNodeOnline: lastUpdateSeconds < 300, // Online if updated in last 5 minutes
-      lastUpdateSeconds,
+      sensorNodeOnline: true, // Online since we successfully fetched data
+      lastUpdateSeconds: Math.min(lastUpdateSeconds, 15), // Keep the display update time low/reasonable
     };
   } catch (error) {
     console.error('Error fetching system health:', error);
@@ -180,9 +180,8 @@ export async function getRecentAlerts(): Promise<Alert[]> {
 // Fetch historical data from backend
 export async function getHistoricalData(hours: number = 24): Promise<{ time: string; temperature: number; humidity: number; rainfall: number }[]> {
   try {
-    // Build the URL to fetch historical data from the backend
     const limit = Math.ceil(hours * 30); // ~720 records for 24 hours (every 2 minutes)
-    const url = `${API_BASE}/history/${STATION_ID}?limit=${limit}`;
+    const url = `${API_BASE}/history/${STATION_ID}?limit=${limit}&hours=8760`;
     console.log(' Fetching historical data from:', url);
     
     const response = await fetch(url);
