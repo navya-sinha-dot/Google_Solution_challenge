@@ -81,14 +81,15 @@ export default function FarmersMap() {
     const map = window.L.map(mapContainerRef.current).setView([22.9734, 78.6569], 5);
     mapRef.current = map;
 
-    // Apply beautiful tiles matching current theme
+    // Apply CartoDB tiles with global English language labels (No native Urdu/Arabic script clutter)
     const tileUrl = isDark
       ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
       : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
 
     window.L.tileLayer(tileUrl, {
-      attribution: '&copy; CartoDB',
-      maxZoom: 18,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 19,
     }).addTo(map);
 
     markersGroupRef.current = window.L.layerGroup().addTo(map);
@@ -184,8 +185,9 @@ export default function FarmersMap() {
       : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
 
     window.L.tileLayer(tileUrl, {
-      attribution: '&copy; CartoDB',
-      maxZoom: 18,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 19,
     }).addTo(mapRef.current);
   }, [isDark]);
 

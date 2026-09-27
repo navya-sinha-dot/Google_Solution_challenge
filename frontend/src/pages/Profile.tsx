@@ -280,10 +280,41 @@ function SchemeCard({ scheme, isMatch, index, isDark }: {
           </div>
         )}
 
-        {/* Apply button */}
-        <PrimaryBtn onClick={() => window.open(scheme.official_url || scheme.link, '_blank')}>
-          <ExternalLink size={15} /> Apply Now
-        </PrimaryBtn>
+        {/* Action buttons */}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <PrimaryBtn onClick={() => {
+            const url = scheme.official_url || scheme.link || '';
+            const isBrokenStateUrl = !url || ['nsmn.mahait.org', 'agripb.gov.in', 'pgsindia-ncof', 'atma.dac', 'ysrrythu', 'mpeuparjan'].some(d => url.includes(d));
+            const targetUrl = isBrokenStateUrl
+              ? `https://www.myscheme.gov.in/search?query=${encodeURIComponent(scheme.scheme_name || '')}`
+              : url;
+            window.open(targetUrl, '_blank', 'noopener,noreferrer');
+          }}>
+            <ExternalLink size={15} /> Apply / Official Portal
+          </PrimaryBtn>
+
+          <button
+            onClick={() => {
+              window.open(`https://www.myscheme.gov.in/search?query=${encodeURIComponent(scheme.scheme_name || '')}`, '_blank', 'noopener,noreferrer');
+            }}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 14px',
+              borderRadius: '10px',
+              border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
+              background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+              color: textSecondary,
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <ShieldCheck size={14} color="#3B82F6" /> MyScheme Portal
+          </button>
+        </div>
       </div>
     </motion.div>
   );

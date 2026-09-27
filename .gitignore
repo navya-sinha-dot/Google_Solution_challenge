@@ -1,5 +1,7 @@
-﻿.env
-.env.pi
+.env
+*.env
+.env.*
+!.env.example
 __pycache__/
 *.pyc
 *.pyo
@@ -9,10 +11,13 @@ __pycache__/
 dist/
 build/
 venv/
+myenv/
+.venv/
 .vscode/
 .DS_Store
 node_modules/
-dist/
+frontend/node_modules/
+frontend/dist/
 .turbo/
 
 # my files

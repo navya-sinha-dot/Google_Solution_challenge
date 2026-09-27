@@ -47,51 +47,66 @@ export function DashboardHeader({
       path: '/dashboard',
       label: 'Dashboard',
       icon: LayoutDashboard,
+      iconOnly: false,
     },
     {
       path: '/profile',
       label: 'Gov Schemes',
+      shortLabel: 'Schemes',
       icon: Landmark,
+      iconOnly: false,
     },
     {
       path: '/marketplace',
       label: 'Marketplace',
+      shortLabel: 'Market',
       icon: Shuffle,
+      iconOnly: false,
     },
     {
       path: '/map',
-      label: 'Map',
+      label: 'Farmers Map',
+      shortLabel: 'Map',
       icon: Map,
+      iconOnly: false,
     },
     {
       path: '/reports',
       label: 'Reports',
       icon: FileText,
+      iconOnly: false,
     },
     {
       path: '/advisor',
       label: 'Farm Advisor',
+      shortLabel: 'Advisor',
       icon: Bot,
+      iconOnly: false,
     },
     {
       path: '/accelerator',
       label: 'AI Accelerator',
+      shortLabel: 'AI Accel',
       icon: Rocket,
+      iconOnly: false,
     },
     {
       path: '/mandi',
-      label: 'Mandi',
+      label: 'Mandi Rates',
       icon: ShoppingBasket,
+      iconOnly: true,
     },
     {
       path: '/trends',
-      label: 'Trends',
+      label: 'Market Trends',
       icon: TrendingUp,
+      iconOnly: true,
     },
     {
       path: '/overview',
       label: 'System Overview',
       icon: BarChart3,
+      iconOnly: true,
     },
   ];
 
@@ -115,8 +130,8 @@ export function DashboardHeader({
         style={{
           width: '100%',
           maxWidth: '1400px',
-          height: '64px',        // was 58px
-          borderRadius: '18px',
+          height: '56px',
+          borderRadius: '16px',
           overflow: 'hidden',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
@@ -138,7 +153,7 @@ export function DashboardHeader({
             padding: '0 12px',
             display: 'flex',
             alignItems: 'center',
-            gap: '10px',
+            gap: '8px',
           }}
         >
           <Link
@@ -153,8 +168,8 @@ export function DashboardHeader({
           >
             <div
               style={{
-                width: '32px',
-                height: '32px',
+                width: '30px',
+                height: '30px',
                 borderRadius: '8px',
                 background: '#10B981',
                 display: 'flex',
@@ -163,11 +178,11 @@ export function DashboardHeader({
                 color: '#ffffff',
               }}
             >
-              <Cloud size={18} fill="#ffffff" strokeWidth={0} />
+              <Cloud size={16} fill="#ffffff" strokeWidth={0} />
             </div>
             <span
               style={{
-                fontSize: '15px',
+                fontSize: '14px',
                 fontWeight: 800,
                 color: isDark ? '#ffffff' : '#0f172a',
                 letterSpacing: '-0.02em',
@@ -183,7 +198,7 @@ export function DashboardHeader({
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '4px',
               flex: 1,
               minWidth: 0,
               overflowX: 'auto',
@@ -192,37 +207,38 @@ export function DashboardHeader({
           >
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;
-              const words = item.label.split(' ');
+              const Icon = item.icon;
 
               return (
                 <Link
                   key={item.path}
                   to={item.path}
+                  title={item.label}
                   style={{
-                    display: 'flex',
-                    flexDirection: 'column',
+                    display: 'inline-flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    padding: '6px 14px',
+                    gap: '6px',
+                    padding: item.iconOnly ? '7px 9px' : '6px 11px',
                     borderRadius: '10px',
                     textDecoration: 'none',
                     whiteSpace: 'nowrap',
-                    fontSize: '12.5px',
-                    lineHeight: '1.2',
-                    fontWeight: isActive ? 700 : 600,
+                    fontSize: '12px',
+                    lineHeight: '1',
+                    fontWeight: isActive ? 700 : 500,
                     flexShrink: 0,
-                    transition: 'all 0.25s ease',
+                    transition: 'all 0.2s ease',
                     textAlign: 'center',
                     color: isActive
                       ? isDark
                         ? '#ffffff'
                         : '#0f172a'
                       : isDark
-                        ? 'rgba(255,255,255,0.55)'
-                        : 'rgba(15,23,42,0.55)',
+                        ? 'rgba(255,255,255,0.60)'
+                        : 'rgba(15,23,42,0.60)',
                     background: isActive
                       ? isDark
-                        ? 'rgba(255,255,255,0.1)'
+                        ? 'rgba(255,255,255,0.12)'
                         : '#ffffff'
                       : 'transparent',
                     boxShadow: isActive && !isDark
@@ -230,14 +246,21 @@ export function DashboardHeader({
                       : 'none',
                     border: isActive
                       ? isDark
-                        ? '1px solid rgba(255,255,255,0.08)'
-                        : '1px solid rgba(0,0,0,0.04)'
+                        ? '1px solid rgba(255,255,255,0.12)'
+                        : '1px solid rgba(0,0,0,0.06)'
                       : '1px solid transparent',
                   }}
                 >
-                  {words.map((word, wIdx) => (
-                    <span key={wIdx} style={{ display: 'block' }}>{word}</span>
-                  ))}
+                  <Icon
+                    size={item.iconOnly ? 16 : 13.5}
+                    style={{
+                      color: isActive ? '#10B981' : 'currentColor',
+                      flexShrink: 0,
+                    }}
+                  />
+                  {!item.iconOnly && (
+                    <span>{item.shortLabel || item.label}</span>
+                  )}
                 </Link>
               );
             })}

@@ -64,8 +64,10 @@ class Settings:
         _groq_raw = _groq_raw.strip().strip('"').strip("'")
         self.GROQ_API_KEYS: List[str] = [k.strip() for k in _groq_raw.split(",") if k.strip()]
         self.GROQ_API_KEY: Optional[str] = self.GROQ_API_KEYS[0] if self.GROQ_API_KEYS else None
-        self.LLM_MODEL: str = os.getenv("LLM_MODEL", "llama-3.1-8b-instant")
+        self.LLM_MODEL: str = os.getenv("LLM_MODEL", "qwen/qwen3.8-27b")
         self.LLM_TIMEOUT: int = int(os.getenv("LLM_TIMEOUT", "30"))
+        self.GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY")
+        self.GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
         # ==================== TWILIO / WHATSAPP ====================
         self.TWILIO_ACCOUNT_SID: Optional[str] = os.getenv("TWILIO_ACCOUNT_SID")

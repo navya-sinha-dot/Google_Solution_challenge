@@ -101,7 +101,58 @@ def get_llm(
         api_key=chosen_key,
         temperature=temperature,
         timeout=timeout,
+        max_tokens=max_tokens,
     )
+
+
+import httpx
+
+def _format_messages_for_gemini(messages: Any) -> str:
+    if isinstance(messages, str):
+        return messages
+    if isinstance(messages, list):
+        parts = []
+        for m in messages:
+            if isinstance(m, tuple) and len(m) == 2:
+                role, content = m
+                parts.append(f"{role.capitalize()}: {content}")
+            elif hasattr(m, "content"):
+                role = getattr(m, "type", "user")
+                parts.append(f"{role.capitalize()}: {m.content}")
+            else:
+                parts.append(str(m))
+        return "\n\n".join(parts)
+    return str(messages)
+
+
+async def _invoke_gemini_fallback(messages: Any, timeout: int = 20) -> Optional[str]:
+    api_key = _settings.GEMINI_API_KEY
+    if not api_key:
+        return None
+    try:
+        prompt_text = _format_messages_for_gemini(messages)
+        model = getattr(_settings, "GEMINI_MODEL", "gemini-2.5-flash")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(
+                url,
+                json={"contents": [{"parts": [{"text": prompt_text}]}]},
+                headers={"Content-Type": "application/json"},
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                candidates = data.get("candidates", [])
+                if candidates and "content" in candidates[0]:
+                    parts = candidates[0]["content"].get("parts", [])
+                    if parts and "text" in parts[0]:
+                        logger.info("Successfully received response from Gemini 2.5 fallback")
+                        return parts[0]["text"]
+            else:
+                logger.warning("Gemini fallback returned %s: %s", resp.status_code, resp.text[:150])
+    except Exception as exc:
+        logger.warning("Gemini fallback exception: %s", exc)
+    return None
 
 
 async def invoke_llm(
@@ -110,75 +161,62 @@ async def invoke_llm(
     temperature: float = 0.25,
     timeout: int = 30,
     retries: int = 3,
+    max_tokens: int = 800,
 ) -> Optional[str]:
     """
     Invoke the LLM with automatic key rotation and retry on failure.
-
-    Args:
-        messages: LangChain-style messages or list of (role, text) tuples.
-        model: Override model name.
-        temperature: Sampling temperature.
-        timeout: Per-request timeout.
-        retries: Number of attempts across different keys.
-
-    Returns:
-        Response content string, or None on complete failure.
+    Falls back to Gemini 2.5 Flash if Groq is unavailable.
     """
 
-    if not _keys:
-        logger.warning("invoke_llm: No API keys available")
-        return None
-
-    if ChatGroq is None:
-        logger.error(
-            "Failed to import langchain_groq. Import error: %s",
-            globals().get("_import_error"),
-        )
-        return None
-
+    chosen_model = model or _settings.LLM_MODEL
     last_exc = None
 
-    for attempt in range(retries):
-        key = _next_healthy_key()
+    if _keys and ChatGroq is not None:
+        for attempt in range(retries):
+            key = _next_healthy_key()
+            if not key:
+                break
 
-        if not key:
-            break
+            try:
+                llm = ChatGroq(
+                    model=chosen_model,
+                    api_key=key,
+                    temperature=temperature,
+                    timeout=timeout,
+                    max_tokens=max_tokens,
+                )
 
-        try:
-            llm = ChatGroq(
-                model=model or _settings.LLM_MODEL,
-                api_key=key,
-                temperature=temperature,
-                timeout=timeout,
-            )
+                response = await asyncio.to_thread(
+                    llm.invoke,
+                    messages,
+                )
 
-            response = await asyncio.to_thread(
-                llm.invoke,
-                messages,
-            )
+                if response and response.content:
+                    return response.content
 
-            return response.content
+            except Exception as exc:
+                last_exc = exc
+                _mark_key_error(key)
+                logger.warning(
+                    "LLM key attempt %d/%d failed with model %s (key=...%s): %s",
+                    attempt + 1,
+                    retries,
+                    chosen_model,
+                    key[-6:],
+                    exc,
+                )
+                # If model name failed, try alternate working Groq model
+                if "does not exist" in str(exc) or "404" in str(exc):
+                    chosen_model = "qwen/qwen3.8-27b" if chosen_model != "qwen/qwen3.8-27b" else "openai/gpt-oss-120b"
+                await asyncio.sleep(0.3 * (attempt + 1))
 
-        except Exception as exc:
-            last_exc = exc
+    # Seamless fallback to Gemini 2.5 Flash
+    logger.info("Attempting Gemini AI fallback...")
+    gemini_resp = await _invoke_gemini_fallback(messages, timeout=timeout)
+    if gemini_resp:
+        return gemini_resp
 
-            _mark_key_error(key)
-
-            logger.warning(
-                "LLM key attempt %d/%d failed (key=...%s): %s",
-                attempt + 1,
-                retries,
-                key[-6:],
-                exc,
-            )
-
-            await asyncio.sleep(0.3 * (attempt + 1))
-
-    logger.error(
-        "All LLM retries exhausted. Last error: %s",
-        last_exc,
-    )
-
+    logger.error("All LLM retries (Groq + Gemini) exhausted. Last error: %s", last_exc)
     return None
 
 

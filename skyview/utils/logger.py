@@ -8,6 +8,11 @@ from skyview.utils.config import get_settings
 
 def setup_logging() -> None:
     settings = get_settings()
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     logging.basicConfig(
         level=getattr(logging, settings.LOG_LEVEL, logging.INFO),
         format=settings.LOG_FORMAT,
