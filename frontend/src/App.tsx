@@ -26,17 +26,18 @@ import HardwareSetup from "./pages/HardwareSetup";
 import BuyHardware from "./pages/BuyHardware";
 import Marketplace from "./pages/Marketplace";
 import FarmersMap from "./pages/FarmersMap";
+import CropDoctor from "./pages/CropDoctor";
 
 import { ThemeProvider } from "next-themes";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // ── Global caching defaults ──────────────────────────────────────
-      staleTime:            30_000,    // data fresh for 30 s — no refetch needed
-      gcTime:               5 * 60_000, // keep in memory 5 min after component unmounts
-      refetchOnWindowFocus: false,     // stop hammering the API on tab switch
-      retry:                1,         // 1 retry on failure
+      // ── Ultra-Cache read-only enterprise caching defaults ──────────
+      staleTime:            5 * 60_000,  // data fresh for 5 min — zero repeated network stalls
+      gcTime:               30 * 60_000, // retain memory cache for 30 min
+      refetchOnWindowFocus: false,       // instant background performance without tab flutter
+      retry:                1,
     },
   },
 });
@@ -152,10 +153,18 @@ const API_URL = import.meta.env.VITE_API_URL || '';
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
+import { ultraCache } from "@/lib/ultraCache";
 
 const AppContent = () => {
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    // ── Ultra-Cache Autonomous Enterprise Background Warmup ──────────
+    // Prefetches weather, mandi rates, circular barter loops, pools, and map directory
+    // with 0ms perceived latency when farmer navigates to any page.
+    ultraCache.warmUpPlatform();
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -255,6 +264,16 @@ const AppContent = () => {
             <ProtectedRoute>
               <HardwareGate>
                 <Dashboard />
+              </HardwareGate>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/crop-doctor"
+          element={
+            <ProtectedRoute>
+              <HardwareGate>
+                <CropDoctor />
               </HardwareGate>
             </ProtectedRoute>
           }
